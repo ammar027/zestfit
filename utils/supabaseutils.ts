@@ -1,4 +1,4 @@
-import { supabase } from './supabse'; // Assuming you have this file with your Supabase client
+import { supabase } from './supabase'; // Assuming you have this file with your Supabase client
 
 // ==================== User Goals ====================
 export const getUserGoals = async () => {

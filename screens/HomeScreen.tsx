@@ -14,7 +14,7 @@ import DateHeader from '../components/DateHeader';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import MacroCards from '../components/MacroCards';
 import ChatInterface from '../components/ChatInterface';
-import { supabase } from '../utils/supabse';
+import { supabase } from '../utils/supabase';
 import {
   getDailyNutrition,
   saveDailyNutrition,
