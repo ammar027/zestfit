@@ -1,120 +1,107 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState } from "react"
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from "react-native"
 
-export default function GoalSettingModal({ visible, onClose, type, goals, onSave }) {
-  const [localGoals, setLocalGoals] = useState(goals);
+interface GoalSettingModalProps {
+  visible: boolean
+  onClose: () => void
+  type: "calories" | "macros"
+  goals: {
+    calories?: number
+    carbs?: number
+    protein?: number
+    fat?: number
+  }
+  onSave: (goals: any) => void
+  isGlobalGoal?: boolean
+}
+
+export default function GoalSettingModal({ visible, onClose, type, goals, onSave, isGlobalGoal = true }: GoalSettingModalProps) {
+  const [localGoals, setLocalGoals] = useState(goals)
 
   return (
-    <Modal
-      visible={visible}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent
-    >
+    <Modal visible={visible} transparent={true} animationType="fade" statusBarTranslucent>
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            Set {type === 'calories' ? 'Calorie' : 'Macro'} Goals
-          </Text>
-          
-          {type === 'calories' ? (
+          <Text style={styles.modalTitle}>Set {type === "calories" ? "Calorie" : "Macro"} Goals</Text>
+
+          {type === "calories" ? (
             <View style={styles.inputContainer}>
               <Text>Daily Calorie Goal:</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                value={String(localGoals.calories)}
-                onChangeText={(text) => setLocalGoals({ calories: parseInt(text) || 0 })}
-              />
+              <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.calories)} onChangeText={(text) => setLocalGoals({ ...localGoals, calories: parseInt(text) || 0 })} />
             </View>
           ) : (
             <>
               <View style={styles.inputContainer}>
                 <Text>Carbs (g):</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={String(localGoals.carbs)}
-                  onChangeText={(text) => 
-                    setLocalGoals(prev => ({ ...prev, carbs: parseInt(text) || 0 }))
-                  }
-                />
+                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.carbs)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, carbs: parseInt(text) || 0 }))} />
               </View>
               <View style={styles.inputContainer}>
                 <Text>Protein (g):</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={String(localGoals.protein)}
-                  onChangeText={(text) => 
-                    setLocalGoals(prev => ({ ...prev, protein: parseInt(text) || 0 }))
-                  }
-                />
+                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.protein)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, protein: parseInt(text) || 0 }))} />
               </View>
               <View style={styles.inputContainer}>
                 <Text>Fat (g):</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={String(localGoals.fat)}
-                  onChangeText={(text) => 
-                    setLocalGoals(prev => ({ ...prev, fat: parseInt(text) || 0 }))
-                  }
-                />
+                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.fat)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, fat: parseInt(text) || 0 }))} />
               </View>
             </>
           )}
+
+          {/* <Text style={styles.noteText}>Note: These changes will update your goals for all days.</Text> */}
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.button} onPress={onClose}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.button, styles.saveButton]}
-              onPress={() => onSave(localGoals)}
-            >
+            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={() => onSave(localGoals)}>
               <Text style={[styles.buttonText, styles.saveButtonText]}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
     </Modal>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 12,
     padding: 20,
-    width: '80%',
+    width: "80%",
     maxWidth: 400,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   inputContainer: {
     marginBottom: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderRadius: 8,
     padding: 8,
     marginTop: 4,
   },
+  noteText: {
+    fontSize: 14,
+    color: "#FF6B6B",
+    fontStyle: "italic",
+    marginTop: 10,
+    textAlign: "center",
+  },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 20,
   },
   button: {
@@ -122,16 +109,16 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginHorizontal: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   buttonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: "#007AFF",
   },
   saveButtonText: {
-    color: 'white',
+    color: "white",
   },
-});
+})

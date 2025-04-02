@@ -93,12 +93,16 @@ export default function DateHeader({
                   onDateChange(newDate);
                 }
               }}
-              style={styles.navButton}
+              style={[
+                styles.navButton,
+                isAfter(addDays(date, 1), new Date()) && {opacity: 0.6}
+              ]}
+              disabled={isAfter(addDays(date, 1), new Date())}
             >
               <MaterialCommunityIcons 
                 name="chevron-right" 
                 size={24} 
-                color="#666" 
+                color={isAfter(addDays(date, 1), new Date()) ? "#ccc" : "#666"}
               />
             </TouchableOpacity>
           </View>

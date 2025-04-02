@@ -1,412 +1,582 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import GoalSettingModal from './GoalSettingModal';
+import React, { useState, useEffect } from "react"
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
+import GoalSettingModal from "./GoalSettingModal"
 
-export default function MacroCards({ 
-  calorieGoal, 
-  macroGoals, 
-  dailyStats, 
-  setCalorieGoal, 
+interface MacroGoals {
+  carbs: number
+  protein: number
+  fat: number
+}
+
+interface CaloriesStats {
+  food: number
+  exercise: number
+}
+
+interface MacrosStats {
+  carbs: number
+  protein: number
+  fat: number
+}
+
+interface DailyStats {
+  calories: CaloriesStats
+  macros: MacrosStats
+}
+
+interface WaterTrackerSettings {
+  enabled: boolean
+  dailyWaterGoal: number
+  cupsConsumed: number
+}
+
+interface MacroCardsProps {
+  calorieGoal: number
+  macroGoals: MacroGoals
+  dailyStats: DailyStats
+  setCalorieGoal: (calories: number) => void
+  setMacroGoals: (macros: MacroGoals) => void
+  waterTrackerSettings?: WaterTrackerSettings
+  isWaterTrackerEnabled?: boolean
+  onIncrementWater?: () => void
+  onDecrementWater?: () => void
+}
+
+interface MacroCardProps {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap
+  title: string
+  current: number
+  goal: number
+  color: string
+  onPress: () => void
+}
+
+export default function MacroCards({
+  calorieGoal,
+  macroGoals,
+  dailyStats,
+  setCalorieGoal,
   setMacroGoals,
   waterTrackerSettings = {
     enabled: false,
     dailyWaterGoal: 0,
-    cupsConsumed: 0
+    cupsConsumed: 0,
   },
   isWaterTrackerEnabled = false,
   onIncrementWater,
-  onDecrementWater
-}) {
-  const [isCalorieModalVisible, setCalorieModalVisible] = useState(false);
-  const [isMacroModalVisible, setMacroModalVisible] = useState(false);
+  onDecrementWater,
+}: MacroCardsProps) {
+  const [isCalorieModalVisible, setCalorieModalVisible] = useState(false)
+  const [isMacroModalVisible, setMacroModalVisible] = useState(false)
 
-  const totalCalories = dailyStats.calories.food - dailyStats.calories.exercise;
-  const remainingCalories = calorieGoal - totalCalories;
+  // Ensure all values are integers to prevent display issues
+  const safeCalorieGoal = Math.round(calorieGoal || 2000)
+  const safeCaloriesFood = Math.round(dailyStats?.calories?.food || 0)
+  const safeCaloriesExercise = Math.round(dailyStats?.calories?.exercise || 0)
+  const safeCarbsGoal = Math.round(macroGoals?.carbs || 250)
+  const safeProteinGoal = Math.round(macroGoals?.protein || 150)
+  const safeFatGoal = Math.round(macroGoals?.fat || 65)
+  const safeCarbsCurrent = Math.round(dailyStats?.macros?.carbs || 0)
+  const safeProteinCurrent = Math.round(dailyStats?.macros?.protein || 0)
+  const safeFatCurrent = Math.round(dailyStats?.macros?.fat || 0)
 
-   const MacroCard = ({ 
-    icon, 
-    title, 
-    current, 
-    goal, 
-    color, 
-    onPress 
-  }) => {
-    const progress = (current / goal) * 100;
-    
+  // Calculate total calories and remaining calories
+  const totalCalories = safeCaloriesFood - safeCaloriesExercise
+  const remainingCalories = safeCalorieGoal - totalCalories
+
+  // Log stats for debugging
+  useEffect(() => {
+    console.log("MacroCards received updated stats:", {
+      calories: { food: safeCaloriesFood, exercise: safeCaloriesExercise },
+      macros: {
+        carbs: safeCarbsCurrent,
+        protein: safeProteinCurrent,
+        fat: safeFatCurrent,
+      },
+    })
+  }, [safeCaloriesFood, safeCaloriesExercise, safeCarbsCurrent, safeProteinCurrent, safeFatCurrent])
+
+  // Handle calorie goal updates
+  const handleCalorieGoalUpdate = (goals: { calories: number }) => {
+    const newCalorieGoal = Math.round(goals.calories)
+
+    // Update state in parent component
+    setCalorieGoal(newCalorieGoal)
+
+    // Close modal
+    setCalorieModalVisible(false)
+  }
+
+  // Handle macro goals updates
+  const handleMacroGoalsUpdate = (goals: { carbs: number; protein: number; fat: number }) => {
+    const newMacroGoals = {
+      carbs: Math.round(goals.carbs),
+      protein: Math.round(goals.protein),
+      fat: Math.round(goals.fat),
+    }
+
+    // Update state in parent component
+    setMacroGoals(newMacroGoals)
+
+    // Close modal
+    setMacroModalVisible(false)
+  }
+
+  const MacroCard = ({ icon, title, current, goal, color, onPress }: MacroCardProps) => {
+    // Ensure progress is between 0 and 100%
+    const progress = Math.min(100, Math.max(0, (current / goal) * 100))
+
     return (
-      <TouchableOpacity 
-        style={styles.macroCard}
-        onPress={onPress}
-      >
+      <TouchableOpacity style={styles.macroCard} onPress={onPress}>
         <View style={styles.macroCardHeader}>
-          <MaterialCommunityIcons 
-            name={icon} 
-            size={24} 
-            color={color} 
-          />
+          <MaterialCommunityIcons name={icon} size={20} color={color} />
           <Text style={styles.macroCardTitle}>{title}</Text>
         </View>
-        
+
         <View style={styles.macroCardContent}>
           <View style={styles.macroProgressContainer}>
-            <View 
+            <View
               style={[
-                styles.macroProgressBar, 
-                { 
-                  width: `${Math.min(progress, 100)}%`, 
-                  backgroundColor: color 
-                }
-              ]} 
+                styles.macroProgressBar,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: color,
+                },
+              ]}
             />
           </View>
-          
+
           <View style={styles.macroValueContainer}>
-            <Text style={styles.macroCurrentValue}>{current}g</Text>
-            <Text style={styles.macroGoalValue}>/ {goal}g</Text>
+            <Text style={[styles.macroCurrentValue, { color }]}>{Math.round(current)}g</Text>
+            <Text style={styles.macroGoalValue}>/ {Math.round(goal)}g</Text>
           </View>
         </View>
       </TouchableOpacity>
-    );
-  };
+    )
+  }
 
   const WaterCard = () => {
-    // Explicitly check if water tracker is enabled
-    if (!waterTrackerSettings.enabled) return null;
+    // Show the card if either flag is true
+    if (!waterTrackerSettings.enabled && !isWaterTrackerEnabled) return null
 
-    const progress = (waterTrackerSettings.cupsConsumed / waterTrackerSettings.dailyWaterGoal) * 100;
+    // Ensure cups consumed and daily goal are valid integers
+    const cupsConsumed = Math.round(waterTrackerSettings.cupsConsumed || 0)
+    const dailyWaterGoal = Math.round(waterTrackerSettings.dailyWaterGoal || 4)
+
+    // Ensure progress is between 0 and 100%
+    const progress = Math.min(100, Math.max(0, (cupsConsumed / dailyWaterGoal) * 100))
 
     return (
       <View style={styles.waterCard}>
         <View style={styles.waterCardContent}>
           <View style={styles.waterCardHeader}>
-            <MaterialCommunityIcons 
-              name="water" 
-              size={20} 
-              color="#007AFF" 
-            />
-            <Text style={styles.waterCardTitle}>Water  </Text>
-                                 <Text style={styles.waterLitersText}>
-            {(waterTrackerSettings.cupsConsumed * 0.25).toFixed(2)} liters
-          </Text>           
+            <MaterialCommunityIcons name="water" size={20} color="#007AFF" />
+            <Text style={styles.waterCardTitle}>Water</Text>
+            <Text style={styles.waterLitersText}>{(cupsConsumed * 0.25).toFixed(2)} L</Text>
           </View>
 
-          
           <View style={styles.waterProgressContainer}>
-            <View 
+            <View
               style={[
-                styles.waterProgressBar, 
-                { 
-                  width: `${Math.min(progress, 100)}%`, 
-                  backgroundColor: '#007AFF' 
-                }
-              ]} 
+                styles.waterProgressBar,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: "#007AFF",
+                },
+              ]}
             />
           </View>
-          
+
           <View style={styles.waterCardControls}>
-            <TouchableOpacity 
-              style={styles.waterControlButton}
-              onPress={onDecrementWater}
-              disabled={waterTrackerSettings.cupsConsumed === 0}
-            >
-              <MaterialCommunityIcons 
-                name="minus" 
-                size={16} 
-                color={waterTrackerSettings.cupsConsumed === 0 ? "#CCCCCC" : "#007AFF"} 
-              />
-            </TouchableOpacity>
-            
-            <Text style={styles.waterCountText}>
-              {waterTrackerSettings.cupsConsumed} / {waterTrackerSettings.dailyWaterGoal} cups
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.waterControlButton}
-              onPress={onIncrementWater}
-              disabled={waterTrackerSettings.cupsConsumed === waterTrackerSettings.dailyWaterGoal}
-            >
-              <MaterialCommunityIcons 
-                name="plus" 
-                size={16} 
-                color={waterTrackerSettings.cupsConsumed === waterTrackerSettings.dailyWaterGoal ? "#CCCCCC" : "#007AFF"} 
-              />
+            <TouchableOpacity style={[styles.waterControlButton, cupsConsumed === 0 ? styles.disabledButton : null]} onPress={onDecrementWater} disabled={cupsConsumed === 0}>
+              <MaterialCommunityIcons name="minus" size={16} color={cupsConsumed === 0 ? "#CCCCCC" : "#007AFF"} />
             </TouchableOpacity>
 
+            <Text style={styles.waterCountText}>
+              {cupsConsumed} / {dailyWaterGoal}
+            </Text>
+
+            <TouchableOpacity style={[styles.waterControlButton, cupsConsumed === dailyWaterGoal ? styles.disabledButton : null]} onPress={onIncrementWater} disabled={cupsConsumed === dailyWaterGoal}>
+              <MaterialCommunityIcons name="plus" size={16} color={cupsConsumed === dailyWaterGoal ? "#CCCCCC" : "#007AFF"} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
-    );
-  };
+    )
+  }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.calorieCard}
-        onPress={() => setCalorieModalVisible(true)}
-      >
-        <View style={styles.calorieCardHeader}>
-          <View style={styles.calorieHeaderLeft}>
-            <MaterialCommunityIcons name="fire" size={24} color="#FF3B30" />
+      {/* Top Row with Calorie and Macro Cards */}
+      <View style={styles.topRow}>
+        {/* Calorie Card */}
+        <TouchableOpacity style={[styles.card, styles.calorieCard]} onPress={() => setCalorieModalVisible(true)}>
+          <View style={styles.calorieCardHeader}>
+            <MaterialCommunityIcons name="fire" size={22} color="#FF3B30" />
             <Text style={styles.cardTitle}>Calories</Text>
           </View>
-          <Text style={styles.remainingCalories}>
-            {remainingCalories > 0 ? `${remainingCalories} cal remaining` : 'Goal Exceeded'}
-          </Text>
-        </View>
-        
-        <View style={styles.calorieContent}>
-          <Text style={styles.calorieMainText}>{totalCalories}</Text>
-          <Text style={styles.calorieSubText}>/ {calorieGoal} cal</Text>
-        </View>
-
-        <View style={styles.calorieDetailContainer}>
-          <View style={styles.calorieDetailItem}>
-            <MaterialCommunityIcons name="food" size={20} color="#4ECDC4" />
-            <Text style={styles.calorieDetailLabel}>Food</Text>
-            <Text style={styles.calorieDetailValue}>+ {dailyStats.calories.food}</Text>
+          <View style={styles.calorieContent}>
+            <Text style={[styles.calorieMainText, { color: remainingCalories < 0 ? "#FF3B30" : "#007AFF" }]}>{totalCalories}</Text>
+            <Text style={styles.calorieSubText}>/ {safeCalorieGoal}</Text>
           </View>
-          <View style={styles.calorieDetailItem}>
-            <MaterialCommunityIcons name="run" size={20} color="#FF6B6B" />
-            <Text style={styles.calorieDetailLabel}>Exercise</Text>
-            <Text style={styles.calorieDetailValue}>- {dailyStats.calories.exercise}</Text>
+          <View style={styles.calorieSeparator} />
+          <View style={styles.calorieDetailContainer}>
+            <View style={styles.detailItem}>
+              <MaterialCommunityIcons name="food" size={16} color="#4ECDC4" />
+              <Text style={styles.detailLabel}>+{safeCaloriesFood} </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <MaterialCommunityIcons name="run" size={16} color="#FF6B6B" />
+              <Text style={styles.detailLabel}>-{safeCaloriesExercise}</Text>
+            </View>
+            <View style={styles.remainingContainer}>
+              <Text style={[styles.remainingText, { color: remainingCalories < 0 ? "#FF3B30" : remainingCalories < 200 ? "#FFA726" : "#4ECDC4" }]}>{remainingCalories > 0 ? remainingCalories + " left" : Math.abs(remainingCalories) + " over"}</Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      <View style={styles.macroCardsContainer}>
-        <MacroCard 
-          icon="bread-slice"
-          title="Carbs"
-          current={dailyStats.macros.carbs}
-          goal={macroGoals.carbs}
-          color="#FF6B6B"
-          onPress={() => setMacroModalVisible(true)}
-        />
-        
-        <MacroCard 
-          icon="food-steak"
-          title="Protein"
-          current={dailyStats.macros.protein}
-          goal={macroGoals.protein}
-          color="#4ECDC4"
-          onPress={() => setMacroModalVisible(true)}
-        />
-        
-        <MacroCard 
-          icon="oil-lamp"
-          title="Fat"
-          current={dailyStats.macros.fat}
-          goal={macroGoals.fat}
-          color="#FFA726"
-          onPress={() => setMacroModalVisible(true)}
-        />
+        {/* Macro Card */}
+        <TouchableOpacity style={[styles.card, styles.macroSummaryCard]} onPress={() => setMacroModalVisible(true)}>
+          <View style={styles.macroCardHeader}>
+            <MaterialCommunityIcons name="progress-check" size={22} color="#007AFF" />
+            <Text style={styles.cardTitle}>Macros</Text>
+          </View>
+
+          <View style={styles.macroValues}>
+            <View style={styles.macroRow}>
+              <MaterialCommunityIcons name="bread-slice" size={16} color="#FF6B6B" />
+              <Text style={styles.macroLabel}>Carbs</Text>
+              <View style={styles.macroProgressMini}>
+                <View
+                  style={[
+                    styles.macroProgressBarMini,
+                    {
+                      width: `${Math.min(100, (safeCarbsCurrent / safeCarbsGoal) * 100)}%`,
+                      backgroundColor: "#FF6B6B",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.macroValueText}>
+                <Text style={[styles.macroCurrentText, { color: "#FF6B6B" }]}>{safeCarbsCurrent}</Text>
+                <Text style={styles.macroSlashText}> / </Text>
+                <Text style={styles.macroGoalText}>{safeCarbsGoal}g</Text>
+              </Text>
+            </View>
+            <View style={styles.macroRow}>
+              <MaterialCommunityIcons name="food-steak" size={16} color="#4ECDC4" />
+              <Text style={styles.macroLabel}>Protein</Text>
+              <View style={styles.macroProgressMini}>
+                <View
+                  style={[
+                    styles.macroProgressBarMini,
+                    {
+                      width: `${Math.min(100, (safeProteinCurrent / safeProteinGoal) * 100)}%`,
+                      backgroundColor: "#4ECDC4",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.macroValueText}>
+                <Text style={[styles.macroCurrentText, { color: "#4ECDC4" }]}>{safeProteinCurrent}</Text>
+                <Text style={styles.macroSlashText}> / </Text>
+                <Text style={styles.macroGoalText}>{safeProteinGoal}g</Text>
+              </Text>
+            </View>
+            <View style={styles.macroRow}>
+              <MaterialCommunityIcons name="human" size={16} color="#FFA726" />
+              <Text style={styles.macroLabel}>Fat</Text>
+              <View style={styles.macroProgressMini}>
+                <View
+                  style={[
+                    styles.macroProgressBarMini,
+                    {
+                      width: `${Math.min(100, (safeFatCurrent / safeFatGoal) * 100)}%`,
+                      backgroundColor: "#FFA726",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.macroValueText}>
+                <Text style={[styles.macroCurrentText, { color: "#FFA726" }]}>{safeFatCurrent}</Text>
+                <Text style={styles.macroSlashText}> / </Text>
+                <Text style={styles.macroGoalText}>{safeFatGoal}g</Text>
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      <WaterCard/>
+      {/* Bottom Row with Water Card */}
+      {(waterTrackerSettings.enabled || isWaterTrackerEnabled) && (
+        <View style={styles.bottomRow}>
+          <WaterCard />
+        </View>
+      )}
 
-      <GoalSettingModal
-        visible={isCalorieModalVisible}
-        onClose={() => setCalorieModalVisible(false)}
-        type="calories"
-        goals={{ calories: calorieGoal }}
-        onSave={(goals) => {
-          setCalorieGoal(goals.calories);
-          setCalorieModalVisible(false);
-        }}
-      />
+      <GoalSettingModal visible={isCalorieModalVisible} onClose={() => setCalorieModalVisible(false)} type="calories" goals={{ calories: safeCalorieGoal }} onSave={handleCalorieGoalUpdate} />
 
       <GoalSettingModal
         visible={isMacroModalVisible}
         onClose={() => setMacroModalVisible(false)}
         type="macros"
-        goals={macroGoals}
-        onSave={(goals) => {
-          setMacroGoals(goals);
-          setMacroModalVisible(false);
+        goals={{
+          carbs: safeCarbsGoal,
+          protein: safeProteinGoal,
+          fat: safeFatGoal,
         }}
+        onSave={handleMacroGoalsUpdate}
       />
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
-  calorieCard: {
-    backgroundColor: 'white',
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "stretch",
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "stretch",
+  },
+  card: {
+    backgroundColor: "white",
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
+    padding: 14,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    flex: 1,
+  },
+  calorieCard: {
+    marginRight: 8,
+  },
+  macroSummaryCard: {
+    marginLeft: 1,
+    padding: 10,
   },
   calorieCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  calorieHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 5,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: 8,
-    color: '#333',
-  },
-  remainingCalories: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+    color: "#333",
   },
   calorieContent: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginBottom: 5,
   },
   calorieMainText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginRight: 8,
+    fontSize: 26,
+    fontWeight: "bold",
+    marginRight: 4,
   },
   calorieSubText: {
     fontSize: 16,
-    color: '#888',
+    color: "#888",
+  },
+  calorieSeparator: {
+    height: 1,
+    backgroundColor: "#F0F0F0",
+    marginBottom: 10,
   },
   calorieDetailContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  calorieDetailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  calorieDetailLabel: {
-    fontSize: 14,
-    color: '#666',
+  detailLabel: {
+    fontSize: 13,
+    color: "#666",
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+  remainingContainer: {
+    marginLeft: "auto",
+  },
+  remainingText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  macroCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  macroValues: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+  },
+  macroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  macroLabel: {
+    fontSize: 13,
+    marginLeft: 5,
+    color: "#333",
+    width: 45,
+    fontWeight: "500",
+  },
+  macroProgressMini: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "#E9E9E9",
+    borderRadius: 2,
+    overflow: "hidden",
     marginHorizontal: 6,
   },
-  calorieDetailValue: {
-    fontSize: 16,
-    fontWeight: '500',
+  macroProgressBarMini: {
+    height: "100%",
+    borderRadius: 2,
   },
-  macroCardsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  macroValueText: {
+    fontSize: 12,
+    color: "#333",
+    width: 72,
+    textAlign: "right",
+    marginRight: 10,
   },
+  macroCurrentText: {
+    fontWeight: "bold",
+  },
+  macroSlashText: {
+    color: "#999",
+  },
+  macroGoalText: {
+    color: "#666",
+  },
+  // MacroCard component styles
   macroCard: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 16,
-    padding: 12,
-    shadowColor: '#000',
+    padding: 14,
+    marginHorizontal: 4,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
-  },
-  macroCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    elevation: 3,
   },
   macroCardTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: "600",
     marginLeft: 8,
-    color: '#333',
+    color: "#333",
   },
   macroCardContent: {
-    flexDirection: 'column',
+    marginTop: 8,
   },
   macroProgressContainer: {
     height: 6,
-    backgroundColor: '#E9E9E9',
+    backgroundColor: "#E9E9E9",
     borderRadius: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 8,
   },
   macroProgressBar: {
-    height: '100%',
+    height: "100%",
     borderRadius: 3,
   },
   macroValueContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "baseline",
+    marginRight: 10,
   },
   macroCurrentValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginRight: 4,
+    fontSize: 16,
+    fontWeight: "bold",
+    marginRight: 2,
   },
   macroGoalValue: {
     fontSize: 14,
-    color: '#888',
+    color: "#888",
   },
+  // Water card styles
   waterCard: {
-      backgroundColor: 'white',
-      borderRadius: 16,
-      marginTop: 12,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    waterCardContent: {
-      padding: 12,
-    },
-    waterCardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    waterCardTitle: {
-      fontSize: 16,
-      fontWeight: '500',
-      marginLeft: 8,
-      color: '#333',
-    },
-    waterProgressContainer: {
-      height: 6,
-      backgroundColor: '#E9E9E9',
-      borderRadius: 3,
-      overflow: 'hidden',
-      marginBottom: 8,
-    },
-    waterProgressBar: {
-      height: '100%',
-      borderRadius: 3,
-    },
-    waterCardControls: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    waterControlButton: {
-      padding: 6,
-    },
-    waterCountText: {
-      fontSize: 14,
-      fontWeight: '500',
-    },
-      waterLitersText: {
-    fontSize: 12,
-    color: '#888',
-    textAlign: 'right',
-    marginTop: 0,
+    backgroundColor: "white",
+    borderRadius: 16,
+    flex: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginTop: 2,
   },
-  });
+  waterCardContent: {
+    padding: 16,
+  },
+  waterCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  waterCardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+    color: "#333",
+  },
+  waterProgressContainer: {
+    height: 6,
+    backgroundColor: "#E9E9E9",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  waterProgressBar: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  waterCardControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  waterControlButton: {
+    padding: 6,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  disabledButton: {
+    backgroundColor: "#F0F0F0",
+    opacity: 0.7,
+  },
+  waterCountText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  waterLitersText: {
+    fontSize: 12,
+    color: "#888",
+    marginLeft: "auto",
+    fontWeight: "500",
+  },
+})

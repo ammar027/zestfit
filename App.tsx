@@ -10,10 +10,17 @@ import WaterTrackerScreen from "./screens/WaterTrackerScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import AuthScreen from "./screens/AuthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import * as NavigationBar from 'expo-navigation-bar';
+import { useEffect } from 'react';
 
 const Drawer = createDrawerNavigator();
 
 export default function App() {
+  useEffect(() => {
+    NavigationBar.setBackgroundColorAsync("#ffffff")
+    NavigationBar.setPositionAsync("absolute")
+  }, [])
+
   return (
     <SafeAreaProvider style={styles.container}>
       <Toaster />
