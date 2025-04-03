@@ -75,7 +75,7 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
     >
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.navigate("Home")}>
           <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Daily Goals</Text>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   saveButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#2C3F00",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",

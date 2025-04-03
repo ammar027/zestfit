@@ -1,6 +1,7 @@
 import { NavigatorScreenParams } from "@react-navigation/native"
 
 export type RootStackParamList = {
+  "Welcome": undefined
   "Home": undefined
   "Auth": undefined
   "Profile": undefined

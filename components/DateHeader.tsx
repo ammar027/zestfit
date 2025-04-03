@@ -60,7 +60,7 @@ export default function DateHeader({
           <MaterialCommunityIcons 
             name="calendar" 
             size={24} 
-            color="#ff3b30" 
+            color="#2C3F00" 
             style={styles.calendarIcon}
           />
 
@@ -136,7 +136,7 @@ export default function DateHeader({
               width={Dimensions.get('window').width * 0.9}
               selectedStartDate={date}
               onDateChange={handleDateChange}
-              selectedDayColor="#ff3b30"
+              selectedDayColor="#2C3F00"
               selectedDayTextColor="white"
               maxDate={new Date()} // Restrict to today and past dates
             />
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   quickDateButton: {
-    backgroundColor: '#ff3b30',
+    backgroundColor: '#2C3F00',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',

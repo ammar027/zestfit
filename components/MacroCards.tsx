@@ -158,7 +158,9 @@ export default function MacroCards({
 
   const WaterCard = () => {
     // Show the card if either flag is true
-    if (!waterTrackerSettings.enabled && !isWaterTrackerEnabled) return null
+    const shouldShow = waterTrackerSettings.enabled || isWaterTrackerEnabled
+
+    if (!shouldShow) return null
 
     // Ensure cups consumed and daily goal are valid integers
     const cupsConsumed = Math.round(waterTrackerSettings.cupsConsumed || 0)
@@ -169,36 +171,36 @@ export default function MacroCards({
 
     return (
       <View style={styles.waterCard}>
-        <View style={styles.waterCardContent}>
-          <View style={styles.waterCardHeader}>
-            <MaterialCommunityIcons name="water" size={20} color="#007AFF" />
-            <Text style={styles.waterCardTitle}>Water</Text>
-            <Text style={styles.waterLitersText}>{(cupsConsumed * 0.25).toFixed(2)} L</Text>
-          </View>
+        <View style={styles.waterCardHeader}>
+          <MaterialCommunityIcons name="water" size={18} color="#2C3F00" />
+          <Text style={styles.waterCardTitle}>Water</Text>
+          <Text style={styles.waterLitersText}>{(cupsConsumed * 0.25).toFixed(1)}L</Text>
+        </View>
 
+        <View style={styles.waterMainContent}>
           <View style={styles.waterProgressContainer}>
             <View
               style={[
                 styles.waterProgressBar,
                 {
                   width: `${progress}%`,
-                  backgroundColor: "#007AFF",
+                  backgroundColor: "#2C3F00",
                 },
               ]}
             />
           </View>
 
           <View style={styles.waterCardControls}>
-            <TouchableOpacity style={[styles.waterControlButton, cupsConsumed === 0 ? styles.disabledButton : null]} onPress={onDecrementWater} disabled={cupsConsumed === 0}>
-              <MaterialCommunityIcons name="minus" size={16} color={cupsConsumed === 0 ? "#CCCCCC" : "#007AFF"} />
+            <TouchableOpacity style={styles.waterControlButton} onPress={onDecrementWater} disabled={cupsConsumed === 0}>
+              <MaterialCommunityIcons name="minus" size={14} color={cupsConsumed === 0 ? "#CCCCCC" : "#2C3F00"} />
             </TouchableOpacity>
 
             <Text style={styles.waterCountText}>
-              {cupsConsumed} / {dailyWaterGoal}
+              {cupsConsumed}/{dailyWaterGoal}
             </Text>
 
-            <TouchableOpacity style={[styles.waterControlButton, cupsConsumed === dailyWaterGoal ? styles.disabledButton : null]} onPress={onIncrementWater} disabled={cupsConsumed === dailyWaterGoal}>
-              <MaterialCommunityIcons name="plus" size={16} color={cupsConsumed === dailyWaterGoal ? "#CCCCCC" : "#007AFF"} />
+            <TouchableOpacity style={styles.waterControlButton} onPress={onIncrementWater} disabled={cupsConsumed === dailyWaterGoal}>
+              <MaterialCommunityIcons name="plus" size={14} color={cupsConsumed === dailyWaterGoal ? "#CCCCCC" : "#2C3F00"} />
             </TouchableOpacity>
           </View>
         </View>
@@ -213,11 +215,11 @@ export default function MacroCards({
         {/* Calorie Card */}
         <TouchableOpacity style={[styles.card, styles.calorieCard]} onPress={() => setCalorieModalVisible(true)}>
           <View style={styles.calorieCardHeader}>
-            <MaterialCommunityIcons name="fire" size={22} color="#FF3B30" />
+            <MaterialCommunityIcons name="fire" size={22} color="#e39454" />
             <Text style={styles.cardTitle}>Calories</Text>
           </View>
           <View style={styles.calorieContent}>
-            <Text style={[styles.calorieMainText, { color: remainingCalories < 0 ? "#FF3B30" : "#007AFF" }]}>{totalCalories}</Text>
+            <Text style={[styles.calorieMainText, { color: remainingCalories < 0 ? "#FF3B30" : "#2C3F00" }]}>{totalCalories}</Text>
             <Text style={styles.calorieSubText}>/ {safeCalorieGoal}</Text>
           </View>
           <View style={styles.calorieSeparator} />
@@ -239,13 +241,13 @@ export default function MacroCards({
         {/* Macro Card */}
         <TouchableOpacity style={[styles.card, styles.macroSummaryCard]} onPress={() => setMacroModalVisible(true)}>
           <View style={styles.macroCardHeader}>
-            <MaterialCommunityIcons name="progress-check" size={22} color="#007AFF" />
+            <MaterialCommunityIcons name="progress-check" size={22} color="#2C3F00" />
             <Text style={styles.cardTitle}>Macros</Text>
           </View>
 
           <View style={styles.macroValues}>
             <View style={styles.macroRow}>
-              <MaterialCommunityIcons name="bread-slice" size={16} color="#FF6B6B" />
+              <MaterialCommunityIcons name="bread-slice" size={16} color="#e39454" />
               <Text style={styles.macroLabel}>Carbs</Text>
               <View style={styles.macroProgressMini}>
                 <View
@@ -309,7 +311,7 @@ export default function MacroCards({
       </View>
 
       {/* Bottom Row with Water Card */}
-      {(waterTrackerSettings.enabled || isWaterTrackerEnabled) && (
+      {(Boolean(waterTrackerSettings.enabled) || Boolean(isWaterTrackerEnabled)) && (
         <View style={styles.bottomRow}>
           <WaterCard />
         </View>
@@ -523,58 +525,57 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginTop: 2,
-  },
-  waterCardContent: {
-    padding: 16,
+    marginTop: 9,
+    padding: 12,
   },
   waterCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   waterCardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-    marginLeft: 8,
+    marginLeft: 6,
     color: "#333",
   },
   waterProgressContainer: {
-    height: 6,
+    height: 4,
     backgroundColor: "#E9E9E9",
-    borderRadius: 3,
+    borderRadius: 2,
     overflow: "hidden",
-    marginBottom: 12,
+    flex: 1,
+    marginRight: 10,
   },
   waterProgressBar: {
     height: "100%",
-    borderRadius: 3,
+    borderRadius: 2,
+  },
+  waterMainContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   waterCardControls: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
   waterControlButton: {
-    padding: 6,
+    padding: 4,
     backgroundColor: "#F5F5F5",
-    borderRadius: 20,
-    width: 32,
-    height: 32,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
   },
-  disabledButton: {
-    backgroundColor: "#F0F0F0",
-    opacity: 0.7,
-  },
   waterCountText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#333",
+    marginHorizontal: 6,
   },
   waterLitersText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#888",
     marginLeft: "auto",
     fontWeight: "500",

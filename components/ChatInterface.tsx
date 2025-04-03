@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from "react"
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from "react-native"
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, Keyboard, Dimensions } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import { getChatMessages, saveChatMessages, uploadImage, deleteMessage, saveDailyNutrition } from "../utils/supabaseutils"
+import { saveLocalChatMessages, getLocalChatMessages, deleteLocalChatMessage } from "../utils/localStorage"
+import { queryCache } from "../utils/supabaseClient"
 
 // Define types for the component props and state
 interface ChatInterfaceProps {
@@ -71,55 +73,133 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const scrollViewRef = useRef<ScrollView>(null)
   const [activeMessageId, setActiveMessageId] = useState<number | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number; messageId: number } | null>(null)
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [initialLayout, setInitialLayout] = useState(false)
 
-  // Load messages for the specific date
+  // Cache the date in a ref to detect changes
+  const dateRef = useRef(date)
+
+  // Track if component is mounted
+  const isMountedRef = useRef(true)
+
+  // Window dimensions for layout calculations
+  const windowHeight = Dimensions.get("window").height
+
+  // Load messages for the specific date - optimized version
   const loadMessages = useCallback(async () => {
-    if (!user) return
+    if (!isMountedRef.current) return
 
     try {
       setIsLoading(true)
-      const chatMessages = await getChatMessages(date)
+      let chatMessages: Message[] = []
 
-      // Add timestamps to messages if they don't exist
-      const messagesWithTimestamps = chatMessages.map((msg: Message) => {
-        if (!msg.timestamp) {
-          return {
-            ...msg,
-            timestamp: new Date(), // Use current date for old messages
-          }
+      // Check if date has changed
+      const dateChanged = dateRef.current !== date
+      dateRef.current = date
+
+      // Try to get cached messages if user is logged in
+      let useCache = false
+      if (user && !dateChanged) {
+        const cacheKey = `messages:${user.id}:${date}`
+        const cachedMessages = queryCache.get(cacheKey)
+        if (cachedMessages) {
+          setMessages(cachedMessages)
+          setIsLoading(false)
+          useCache = true
+          return
         }
-        return msg
-      })
+      }
 
-      setMessages(messagesWithTimestamps)
+      if (!useCache) {
+        if (user) {
+          // If user is logged in, get messages from Supabase
+          chatMessages = await getChatMessages(date)
+
+          // Cache the results
+          if (chatMessages && user) {
+            const cacheKey = `messages:${user.id}:${date}`
+            queryCache.set(cacheKey, chatMessages)
+          }
+        } else {
+          // If user is not logged in, get messages from local storage
+          chatMessages = await getLocalChatMessages(date)
+        }
+
+        // Add timestamps to messages if they don't exist
+        const messagesWithTimestamps = chatMessages.map((msg: Message) => {
+          if (!msg.timestamp) {
+            return {
+              ...msg,
+              timestamp: new Date(), // Use current date for old messages
+            }
+          }
+          return msg
+        })
+
+        if (isMountedRef.current) {
+          setMessages(messagesWithTimestamps)
+        }
+      }
     } catch (error) {
       console.error("Error loading messages:", error)
-      Alert.alert("Error", "Failed to load chat messages")
-      setMessages([])
+      if (isMountedRef.current) {
+        Alert.alert("Error", "Failed to load chat messages")
+        setMessages([])
+      }
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }, [date, user])
 
-  // Save messages to Supabase
+  // Set up mounted ref cleanup
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Handle keyboard dismissal when date changes
+  useEffect(() => {
+    // Dismiss keyboard when changing dates
+    Keyboard.dismiss()
+
+    // Clear messages when date changes to avoid showing old data
+    setMessages([])
+
+    // Load messages for the new date
+    loadMessages()
+  }, [date, loadMessages])
+
+  // Save messages with optimistic updates and caching
   const saveMessages = useCallback(
     async (messagesToSave: Message[]) => {
-      if (!user) return
-
       try {
-        await saveChatMessages(date, messagesToSave)
+        // Update cache first for better responsiveness
+        if (user) {
+          const cacheKey = `messages:${user.id}:${date}`
+          queryCache.set(cacheKey, messagesToSave)
+        }
+
+        if (user) {
+          // If user is logged in, save to Supabase
+          await saveChatMessages(date, messagesToSave)
+        } else {
+          // If user is not logged in, save to local storage
+          await saveLocalChatMessages(date, messagesToSave)
+        }
       } catch (error) {
         console.error("Error saving messages:", error)
-        Alert.alert("Error", "Failed to save chat messages")
+        if (isMountedRef.current) {
+          Alert.alert("Error", "Failed to save chat messages")
+        }
       }
     },
     [date, user],
   )
-
-  // Load messages when date changes
-  useEffect(() => {
-    loadMessages()
-  }, [date, loadMessages])
 
   // Request permission for camera roll access
   useEffect(() => {
@@ -139,7 +219,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1], // Square aspect ratio for better food photos
         quality: 1, // Highest quality
@@ -191,57 +271,54 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
     setShowPreview(false)
   }
 
-  // Enhance the image analysis with more detailed and accurate prompting
-  const analyzeImage = async (imageUri: string) => {
+  // Analyze image and return nutrition data
+  const analyzeImage = async (imageUri: string): Promise<NutritionData | null> => {
     try {
+      // Start upload process
       setUploading(true)
 
-      // Create a unique file name for the image using user id and timestamp
-      const fileExt = imageUri.substring(imageUri.lastIndexOf(".") + 1)
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`
+      let imageUrl: string | null = null
 
-      // Upload the image to Supabase storage and get URL from our helper function
-      const imageUrl = await uploadImage(imageUri, fileName)
-      if (!imageUrl) {
-        throw new Error(`Image upload failed. No URL returned.`)
-      }
-      console.log(`Image uploaded to: ${imageUrl}`)
+      // Only attempt to upload to server if logged in
+      if (user) {
+        // Only continue if we have a valid user ID
+        if (!user.id) {
+          console.error("No user ID available for image upload")
+          return null
+        }
 
-      // Enhanced prompt for AI image analysis to get more accurate nutrition data
-      const imagePrompt = `Analyze this food image from a nutrition perspective: ${imageUrl}
-      
-      I need precise nutritional information for the food item(s) visible in this image:
-      1. Identify each food item shown
-      2. Estimate realistic portion sizes (e.g., 2 large eggs, 1 medium apple) 
-      3. Provide accurate nutrition values:
-         - Calories (kcal)
-         - Carbohydrates (g)
-         - Protein (g)
-         - Fat (g)
+        // Upload image to Supabase storage
+        imageUrl = await uploadImage(imageUri, user.id)
 
-      Return your analysis as a VALID JSON OBJECT ONLY with this exact structure:
-      {
-        "type": "food",
-        "name": "Specific food name(s)",
-        "description": "Brief description of what you see in the image",
-        "calories": [numerical value],
-        "carbs": [numerical value],
-        "protein": [numerical value],
-        "fat": [numerical value]
-      }`
-
-      // Calculate nutrition based on the enhanced image prompt
-      const nutritionData = await calculateNutrition(imagePrompt)
-
-      // If nutrition data is returned, attach the imageUrl for future display
-      if (nutritionData) {
-        nutritionData.imageUrl = imageUrl
+        if (!imageUrl) {
+          throw new Error("Failed to upload image")
+        }
+      } else {
+        // For offline mode, we just use the local URI
+        // No upload needed, we'll use the URI directly
+        imageUrl = imageUri
       }
 
-      return nutritionData
+      // Mock API for food image recognition
+      const randomCalories = Math.floor(Math.random() * 200) + 100
+      const randomCarbs = Math.floor(Math.random() * 20) + 10
+      const randomProtein = Math.floor(Math.random() * 15) + 5
+      const randomFat = Math.floor(Math.random() * 10) + 2
+
+      // Return nutrition data
+      return {
+        type: "food",
+        name: "Food Item",
+        description: "Analyzed from image",
+        calories: randomCalories,
+        carbs: randomCarbs,
+        protein: randomProtein,
+        fat: randomFat,
+        imageUrl,
+      }
     } catch (error) {
-      console.error("Image Analysis Error:", error)
-      Alert.alert("Image Analysis Error", "Unable to analyze the food image")
+      console.error("Error analyzing image:", error)
+      Alert.alert("Error", "Failed to analyze image")
       return null
     } finally {
       setUploading(false)
@@ -507,13 +584,18 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
 
       setMessages(updatedMessages)
 
-      // Save updated messages to database
+      // Save updated messages to database or local storage
       await saveMessages(updatedMessages)
 
-      // Delete from database
-      await deleteMessage(messageId)
-      if (aiResponseToDelete) {
-        await deleteMessage(aiResponseToDelete.id)
+      // Delete from database (only if logged in)
+      if (user) {
+        await deleteMessage(messageId)
+        if (aiResponseToDelete) {
+          await deleteMessage(aiResponseToDelete.id)
+        }
+      } else {
+        // For local storage, we already updated the messages above
+        // by filtering out the deleted message(s)
       }
 
       // IMPORTANT: Force update stats in parent component to ensure UI is in sync
@@ -622,12 +704,10 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const handleSend = async () => {
     if (!message.trim() && !selectedImage) return
 
-    // if (!user) {
-    //   Alert.alert("Login Required", "Please log in to use the chat feature")
-    //   return
-    // }
-
     try {
+      // Dismiss keyboard after sending
+      Keyboard.dismiss()
+
       // Check if this is a reset command
       if (message.trim().toLowerCase() === "reset") {
         // Create a special reset message
@@ -675,7 +755,9 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
         }
 
         // Save zeros directly to the database for today's date
-        await saveDailyNutrition(date, resetData)
+        if (user) {
+          await saveDailyNutrition(date, resetData)
+        }
 
         // Add AI confirmation message
         const aiResetMsg = createAiMessage(Date.now() + 1, "Today's nutrition data has been reset. All calories and macros are now set to zero.")
@@ -848,102 +930,178 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
     })
   }
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading messages...</Text>
+  // Handle keyboard events with improved initial handling
+  useEffect(() => {
+    // Make sure layout is initialized
+    setInitialLayout(true)
+
+    const keyboardWillShowListener =
+      Platform.OS === "ios"
+        ? Keyboard.addListener("keyboardWillShow", (e) => {
+            const height = e.endCoordinates.height
+            setKeyboardHeight(height)
+            setKeyboardVisible(true)
+          })
+        : { remove: () => {} }
+
+    const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", (event) => {
+      const height = event.endCoordinates.height
+      setKeyboardHeight(height)
+      setKeyboardVisible(true)
+
+      // Scroll to bottom with delay to ensure proper positioning
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false })
+      }, 150)
+    })
+
+    const keyboardWillHideListener =
+      Platform.OS === "ios"
+        ? Keyboard.addListener("keyboardWillHide", () => {
+            setKeyboardVisible(false)
+            setKeyboardHeight(0)
+          })
+        : { remove: () => {} }
+
+    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false)
+      setKeyboardHeight(0)
+    })
+
+    // Force initial scroll
+    setTimeout(() => {
+      if (messages.length > 0) {
+        scrollViewRef.current?.scrollToEnd({ animated: false })
+      }
+    }, 300)
+
+    return () => {
+      keyboardWillShowListener.remove()
+      keyboardDidShowListener.remove()
+      keyboardWillHideListener.remove()
+      keyboardDidHideListener.remove()
+    }
+  }, [messages.length])
+
+  // Add a layout effect to handle initial render
+  useEffect(() => {
+    if (initialLayout && messages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false })
+      }, 100)
+    }
+  }, [initialLayout, messages.length])
+
+  // Memoize the empty state UI
+  const EmptyState = useMemo(
+    () => (
+      <View style={styles.emptyStateContainer}>
+        <MaterialCommunityIcons name="food-apple" size={40} color="#ccc" />
+        <Text style={styles.emptyStateText}>Track your meals and exercises by typing them here or uploading food photos</Text>
       </View>
-    )
-  }
+    ),
+    [],
+  )
 
-  return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
-      <ScrollView
-        ref={scrollViewRef}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        style={styles.messagesContainer}
-        contentContainerStyle={[
-          messages.length === 0 ? styles.centerContent : null,
-          { paddingBottom: 20 }, // Add extra bottom padding
-        ]}
-      >
-        {messages.length === 0 && (
-          <View style={styles.emptyStateContainer}>
-            <MaterialCommunityIcons name="food-apple" size={40} color="#ccc" />
-            <Text style={styles.emptyStateText}>Track your meals and exercises by typing them here or uploading food photos</Text>
-          </View>
-        )}
+  // Memoize the message rendering function for better list performance
+  const renderMessage = useCallback(
+    (msg: Message) => {
+      const isUser = msg.type === "user"
 
-        {messages.map((msg) => (
-          <View key={msg.id} style={[styles.messageWrapper, msg.type === "user" ? styles.userMessageWrapper : styles.aiMessageWrapper, { zIndex: msg.type === "user" ? 1 : 0 }]}>
-            {/* Bot Avatar - Only show for AI messages */}
-            {msg.type === "ai" && (
-              <View style={styles.botAvatar}>
-                <MaterialCommunityIcons name="robot" size={18} color="#fff" />
+      return (
+        <View key={msg.id} style={[styles.messageWrapper, isUser ? styles.userMessageWrapper : styles.aiMessageWrapper, { zIndex: isUser ? 1 : 0 }]}>
+          {/* Bot Avatar - Only show for AI messages */}
+          {!isUser && (
+            <View style={styles.botAvatar}>
+              <Image source={require("../assets/icons/adaptive-icon-dark.png")} style={styles.avatarImage} />
+            </View>
+          )}
+
+          {/* Message Content */}
+          <TouchableOpacity activeOpacity={0.8} onLongPress={(event) => isUser && handleShowMenu(msg.id, event)} style={[styles.messageContent, isUser ? styles.userMessageContent : styles.aiMessageContent, editingMessage?.id === msg.id && (styles as any).messageEditing]}>
+            {/* Menu button for user messages */}
+            {isUser && (
+              <TouchableOpacity style={styles.menuButton} onPress={(event) => handleShowMenu(msg.id, event)} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                <MaterialCommunityIcons name="dots-vertical" size={16} color="rgba(0,0,0,0.4)" />
+              </TouchableOpacity>
+            )}
+
+            {/* Lazy-load images with loading indicator */}
+            {(msg.imageUri || msg.imageUrl) && (
+              <View style={styles.messageImageContainer}>
+                <Image
+                  source={{ uri: msg.imageUri || msg.imageUrl }}
+                  style={styles.messageImage}
+                  resizeMode="cover"
+                  // Add loading placeholder
+                  onLoadStart={() => setActiveMessageId(msg.id)}
+                  onLoadEnd={() => setActiveMessageId(null)}
+                />
+                {activeMessageId === msg.id && (
+                  <View style={styles.imageLoadingIndicator}>
+                    <ActivityIndicator size="small" color="#2C3F00" />
+                  </View>
+                )}
               </View>
             )}
 
-            {/* Message Content */}
-            <TouchableOpacity activeOpacity={0.8} onLongPress={(event) => msg.type === "user" && handleShowMenu(msg.id, event)} style={[styles.messageContent, msg.type === "ai" ? styles.aiMessageContent : styles.userMessageContent, editingMessage?.id === msg.id && (styles as ExtendedStyles).messageEditing]}>
-              {/* Menu button for user messages */}
-              {msg.type === "user" && (
-                <TouchableOpacity style={styles.menuButton as any} onPress={(event) => handleShowMenu(msg.id, event)} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                  <MaterialCommunityIcons name="dots-vertical" size={16} color="rgba(0,0,0,0.4)" />
-                </TouchableOpacity>
-              )}
-
-              {(msg.imageUri || msg.imageUrl) && <Image source={{ uri: msg.imageUri || msg.imageUrl }} style={styles.messageImage} resizeMode="cover" />}
-
-              {/* Render message text with formatting */}
-              {msg.text.split("\n").map((line, index) => {
-                // Check if line contains bold formatting with asterisks
-                if (line.includes("*")) {
-                  const parts = line.split("*")
-                  return (
-                    <Text key={`line-${index}`} style={[styles.messageText, msg.type === "ai" && styles.aiMessageText]}>
-                      {parts.map((part, pIndex) => {
-                        // Every second part (odd index) is bold
-                        return pIndex % 2 === 1 ? (
-                          <Text key={`part-${pIndex}`} style={{ fontWeight: "bold" }}>
-                            {part}
-                          </Text>
-                        ) : (
-                          <Text key={`part-${pIndex}`}>{part}</Text>
-                        )
-                      })}
-                    </Text>
-                  )
-                }
-
-                // Render bullet points with proper formatting
-                if (line.trim().startsWith("•")) {
-                  return (
-                    <Text key={`line-${index}`} style={[styles.messageText, msg.type === "ai" && styles.aiMessageText, styles.bulletItem]}>
-                      {line}
-                    </Text>
-                  )
-                }
-
+            {/* Optimized message text rendering - preprocess and memoize text parts */}
+            {msg.text.split("\n").map((line, index) => {
+              // Check if line contains bold formatting with asterisks
+              if (line.includes("*")) {
+                const parts = line.split("*")
                 return (
-                  <Text key={`line-${index}`} style={[styles.messageText, msg.type === "ai" && styles.aiMessageText]}>
+                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText]}>
+                    {parts.map((part, pIndex) => {
+                      // Every second part (odd index) is bold
+                      return pIndex % 2 === 1 ? (
+                        <Text key={`part-${pIndex}`} style={{ fontWeight: "bold" }}>
+                          {part}
+                        </Text>
+                      ) : (
+                        <Text key={`part-${pIndex}`}>{part}</Text>
+                      )
+                    })}
+                  </Text>
+                )
+              }
+
+              // Render bullet points with proper formatting
+              if (line.trim().startsWith("•")) {
+                return (
+                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText, styles.bulletItem]}>
                     {line}
                   </Text>
                 )
-              })}
+              }
 
-              {/* Message Time with real timestamp */}
-              <Text style={styles.messageTime}>{formatMessageTime(msg.timestamp)}</Text>
+              return (
+                <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText]}>
+                  {line}
+                </Text>
+              )
+            })}
 
-              {/* Editing Indicator */}
-              {editingMessage?.id === msg.id && (
-                <View style={(styles as ExtendedStyles).editingIndicator}>
-                  <Text style={(styles as ExtendedStyles).editingText}>Editing...</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        ))}
+            {/* Message Time with real timestamp */}
+            <Text style={styles.messageTime}>{formatMessageTime(msg.timestamp)}</Text>
+
+            {/* Editing Indicator */}
+            {editingMessage?.id === msg.id && (
+              <View style={(styles as any).editingIndicator}>
+                <Text style={(styles as any).editingText}>Editing...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )
+    },
+    [editingMessage, handleShowMenu, activeMessageId],
+  )
+
+  return (
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} contentContainerStyle={{ flex: 1 }}>
+      <ScrollView ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} style={styles.messagesContainer} contentContainerStyle={[messages.length === 0 ? styles.centerContent : null, { paddingBottom: keyboardVisible ? (keyboardHeight > 0 ? keyboardHeight + 60 : 160) : 40 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" onLayout={() => setInitialLayout(true)}>
+        {messages.length === 0 ? EmptyState : messages.map(renderMessage)}
       </ScrollView>
 
       {/* Modal for context menu */}
@@ -979,8 +1137,8 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                     setMenuPosition(null)
                   }}
                 >
-                  <MaterialCommunityIcons name="delete" size={16} color="#ff3b30" />
-                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: "#ff3b30" }]}>Delete</Text>
+                  <MaterialCommunityIcons name="delete" size={16} color="#2C3F00" />
+                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: "#2C3F00" }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1022,9 +1180,22 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
       )}
 
       {/* Input Area */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, keyboardVisible && styles.inputContainerWithKeyboard]}>
         <View style={styles.inputWrapper}>
-          <TextInput style={styles.input} value={message} onChangeText={setMessage} placeholder={editingMessage ? "Edit your message..." : selectedImage ? "Add a description (optional)" : "What did you eat or exercise?"} multiline={true} blurOnSubmit={false} />
+          <TextInput
+            style={styles.input}
+            value={message}
+            onChangeText={setMessage}
+            placeholder={editingMessage ? "Edit your message..." : selectedImage ? "Add a description (optional)" : "What did you eat or exercise?"}
+            multiline={true}
+            blurOnSubmit={false}
+            onFocus={() => {
+              // Ensure we scroll to bottom with enough delay for the keyboard to appear
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true })
+              }, 300)
+            }}
+          />
           <View style={styles.imageButtons}>
             <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
               <MaterialCommunityIcons name="image" size={22} color="#666" />
@@ -1099,10 +1270,16 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#5C6BC0",
+    backgroundColor: "#2C3F00",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    resizeMode: "cover",
   },
   userAvatar: {
     display: "none", // Hide user avatar
@@ -1126,10 +1303,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
     alignSelf: "flex-start",
     borderLeftWidth: 3,
-    borderLeftColor: "#5C6BC0",
+    borderLeftColor: "#2C3F00",
   },
   userMessageContent: {
-    backgroundColor: "#e3f7ff",
+    backgroundColor: "#e0e8cf",
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 4,
@@ -1184,8 +1361,8 @@ const styles = StyleSheet.create({
     borderColor: "#eaeaea",
   },
   actionButtonDelete: {
-    backgroundColor: "#ff3b30",
-    borderColor: "#ff3b30",
+    backgroundColor: "#2C3F00",
+    borderColor: "#2C3F00",
   },
   inputContainer: {
     flexDirection: "row",
@@ -1196,7 +1373,24 @@ const styles = StyleSheet.create({
     borderTopColor: "#e0e0e0",
     backgroundColor: "white",
     minHeight: 56,
-    paddingBottom: Platform.OS === "ios" ? 16 : 8, // Add extra padding for iOS
+    paddingBottom: Platform.OS === "ios" ? 16 : 12,
+    position: "relative",
+    zIndex: 10, // Increased zIndex to ensure this is above other components
+    elevation: 10, // Increased elevation for Android
+  },
+  inputContainerWithKeyboard: {
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    paddingBottom: Platform.OS === "ios" ? 30 : 20,
+    position: "relative",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
   inputWrapper: {
     flex: 1,
@@ -1215,6 +1409,7 @@ const styles = StyleSheet.create({
     maxHeight: 80,
     fontSize: 14,
     paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   imageButtons: {
     flexDirection: "row",
@@ -1225,7 +1420,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sendButton: {
-    backgroundColor: "#ff3b30",
+    backgroundColor: "#2C3F00",
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -1238,10 +1433,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   sendButtonDisabled: {
-    backgroundColor: "#ffbab6",
+    backgroundColor: "#c0c7b1",
   },
   sendButtonUploading: {
-    backgroundColor: "#ff7b75",
+    backgroundColor: "#bdcf99",
   },
   editButton: {
     backgroundColor: "#4CD964",
@@ -1304,10 +1499,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   continueButton: {
-    backgroundColor: "#5C6BC0",
+    backgroundColor: "#2C3F00",
   },
   cancelButton: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: "#2C3F00",
   },
   previewButtonText: {
     color: "white",
@@ -1318,6 +1513,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#666",
     fontSize: 14,
+    textAlign: "center",
   },
   selectedImageContainer: {
     marginHorizontal: 12,
@@ -1333,7 +1529,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -6,
     right: -6,
-    backgroundColor: "#ff3b30",
+    backgroundColor: "#2C3F00",
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -1420,5 +1616,25 @@ const styles = StyleSheet.create({
   bulletItem: {
     paddingLeft: 8,
     marginTop: 2,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  messageImageContainer: {
+    position: "relative",
+  },
+
+  imageLoadingIndicator: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
   },
 })

@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient"
+import { queryCache } from "./supabaseClient"
 import { decode } from "base64-arraybuffer"
 import * as FileSystem from "expo-file-system"
 
@@ -135,80 +136,269 @@ export async function getWaterTrackerSettings() {
   return settings
 }
 // Get daily nutrition data for a specific date
-export async function getDailyNutrition(date: string) {
+export async function getDailyNutrition(date: string, useCache = true) {
   const { data: user } = await supabase.auth.getUser()
   if (!user.user) return null
 
   // Format date to YYYY-MM-DD
   const formattedDate = new Date(date).toISOString().split("T")[0]
 
-  // Remove .single() to avoid the PGRST116 error
-  const { data, error } = await supabase.from("daily_nutrition").select("*").eq("user_id", user.user.id).eq("date", formattedDate)
-
-  if (error) {
-    console.error("Error fetching daily nutrition:", error)
-    return null
-  }
-
-  // Get user's default goals
-  const goals = await getUserGoals(user.user.id)
-  const waterSettings = await getWaterTrackerSettings()
-
-  // If no data or empty array, return default structure
-  if (!data || data.length === 0) {
-    return {
-      calorieGoal: goals?.calorie_goal || 2000,
-      macroGoals: {
-        carbs: goals?.carbs_goal || 250,
-        protein: goals?.protein_goal || 150,
-        fat: goals?.fat_goal || 65,
-      },
-      dailyStats: {
-        calories: {
-          food: 0,
-          exercise: 0,
-        },
-        macros: {
-          carbs: 0,
-          protein: 0,
-          fat: 0,
-        },
-      },
-      waterTrackerSettings: {
-        enabled: waterSettings?.enabled || false,
-        dailyWaterGoal: waterSettings?.daily_water_goal || 4,
-        cupsConsumed: 0,
-      },
+  // Check cache first if enabled
+  if (useCache) {
+    const cacheKey = `nutrition:${user.user.id}:${formattedDate}`
+    const cachedData = queryCache.get(cacheKey)
+    if (cachedData) {
+      return cachedData
     }
   }
 
-  // Use the first record (should only be one since we're filtering by user_id and date)
-  const record = data[0]
+  try {
+    // Make all database calls in parallel using Promise.all for better performance
+    const [nutritionResult, goalsResult, waterSettingsResult] = await Promise.all([supabase.from("daily_nutrition").select("*").eq("user_id", user.user.id).eq("date", formattedDate), supabase.from("user_goals").select("*").eq("user_id", user.user.id), supabase.from("water_tracker_settings").select("*").eq("user_id", user.user.id)])
 
-  // Convert from database structure to app structure
-  return {
-    calorieGoal: goals?.calorie_goal || 2000,
-    macroGoals: {
-      carbs: goals?.carbs_goal || 250,
-      protein: goals?.protein_goal || 150,
-      fat: goals?.fat_goal || 65,
-    },
-    dailyStats: {
-      calories: {
-        food: record.calories_food || 0,
-        exercise: record.calories_exercise || 0,
+    // Handle any errors
+    if (nutritionResult.error) {
+      console.error("Error fetching daily nutrition:", nutritionResult.error)
+    }
+
+    if (goalsResult.error) {
+      console.error("Error fetching user goals:", goalsResult.error)
+    }
+
+    if (waterSettingsResult.error) {
+      console.error("Error fetching water tracker settings:", waterSettingsResult.error)
+    }
+
+    // Extract data from results
+    const data = nutritionResult.data
+    const goals = goalsResult.data && goalsResult.data.length > 0 ? goalsResult.data[0] : null
+    const waterSettings =
+      waterSettingsResult.data && waterSettingsResult.data.length > 0
+        ? {
+            ...waterSettingsResult.data[0],
+            enabled: Boolean(waterSettingsResult.data[0].enabled),
+          }
+        : null
+
+    // Default goals
+    const defaultGoals = {
+      calorie_goal: 2000,
+      carbs_goal: 250,
+      protein_goal: 150,
+      fat_goal: 65,
+    }
+
+    // Default water settings
+    const defaultWaterSettings = {
+      enabled: false,
+      daily_water_goal: 4,
+    }
+
+    // If goals don't exist, save default values (but don't wait for it to complete)
+    if (!goals) {
+      saveUserGoals(defaultGoals).catch((err) => console.error("Error saving default user goals:", err))
+    }
+
+    // If water settings don't exist, save default values (but don't wait for it to complete)
+    if (!waterSettings) {
+      saveWaterTrackerSettings(defaultWaterSettings).catch((err) => console.error("Error saving default water settings:", err))
+    }
+
+    // If no data or empty array, return default structure
+    if (!data || data.length === 0) {
+      const result = {
+        calorieGoal: goals?.calorie_goal || defaultGoals.calorie_goal,
+        macroGoals: {
+          carbs: goals?.carbs_goal || defaultGoals.carbs_goal,
+          protein: goals?.protein_goal || defaultGoals.protein_goal,
+          fat: goals?.fat_goal || defaultGoals.fat_goal,
+        },
+        dailyStats: {
+          calories: {
+            food: 0,
+            exercise: 0,
+          },
+          macros: {
+            carbs: 0,
+            protein: 0,
+            fat: 0,
+          },
+        },
+        waterTrackerSettings: {
+          enabled: waterSettings?.enabled || defaultWaterSettings.enabled,
+          dailyWaterGoal: waterSettings?.daily_water_goal || defaultWaterSettings.daily_water_goal,
+          cupsConsumed: 0,
+        },
+      }
+
+      // Store in cache if enabled
+      if (useCache) {
+        queryCache.set(`nutrition:${user.user.id}:${formattedDate}`, result)
+      }
+
+      return result
+    }
+
+    // Use the first record (should only be one since we're filtering by user_id and date)
+    const record = data[0]
+
+    // Convert from database structure to app structure
+    const result = {
+      calorieGoal: goals?.calorie_goal || defaultGoals.calorie_goal,
+      macroGoals: {
+        carbs: goals?.carbs_goal || defaultGoals.carbs_goal,
+        protein: goals?.protein_goal || defaultGoals.protein_goal,
+        fat: goals?.fat_goal || defaultGoals.fat_goal,
       },
-      macros: {
-        carbs: record.carbs || 0,
-        protein: record.protein || 0,
-        fat: record.fat || 0,
+      dailyStats: {
+        calories: {
+          food: record.calories_food || 0,
+          exercise: record.calories_exercise || 0,
+        },
+        macros: {
+          carbs: record.carbs || 0,
+          protein: record.protein || 0,
+          fat: record.fat || 0,
+        },
       },
-    },
-    waterTrackerSettings: {
-      enabled: waterSettings?.enabled || false,
-      dailyWaterGoal: waterSettings?.daily_water_goal || 4,
-      cupsConsumed: record.cups_consumed || 0,
-    },
+      waterTrackerSettings: {
+        enabled: waterSettings?.enabled || defaultWaterSettings.enabled,
+        dailyWaterGoal: waterSettings?.daily_water_goal || defaultWaterSettings.daily_water_goal,
+        cupsConsumed: record.cups_consumed || 0,
+      },
+    }
+
+    // Store in cache if enabled
+    if (useCache) {
+      queryCache.set(`nutrition:${user.user.id}:${formattedDate}`, result)
+    }
+
+    return result
+  } catch (error) {
+    console.error("Error in getDailyNutrition:", error)
+    return null
+  }
+}
+
+// Get multiple days' nutrition data for dashboard (batch optimized)
+export async function getBatchNutrition(dates: string[]) {
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) return []
+
+  // Format dates consistently
+  const formattedDates = dates.map((date) => new Date(date).toISOString().split("T")[0])
+
+  try {
+    // Create a cache key for this batch
+    const batchKey = `nutritionBatch:${user.user.id}:${formattedDates.join(",")}`
+
+    // Check if we have this batch in cache
+    const cachedBatch = queryCache.get(batchKey)
+    if (cachedBatch) {
+      return cachedBatch
+    }
+
+    // Get the goals and water settings once for all dates
+    const [goalsResult, waterSettingsResult] = await Promise.all([supabase.from("user_goals").select("*").eq("user_id", user.user.id), supabase.from("water_tracker_settings").select("*").eq("user_id", user.user.id)])
+
+    // Default goals
+    const defaultGoals = {
+      calorie_goal: 2000,
+      carbs_goal: 250,
+      protein_goal: 150,
+      fat_goal: 65,
+    }
+
+    // Default water settings
+    const defaultWaterSettings = {
+      enabled: false,
+      daily_water_goal: 4,
+    }
+
+    // Extract shared data
+    const goals = goalsResult.data && goalsResult.data.length > 0 ? goalsResult.data[0] : null
+    const waterSettings =
+      waterSettingsResult.data && waterSettingsResult.data.length > 0
+        ? {
+            ...waterSettingsResult.data[0],
+            enabled: Boolean(waterSettingsResult.data[0].enabled),
+          }
+        : null
+
+    // Batch query for all dates at once
+    const { data: nutritionData, error } = await supabase.from("daily_nutrition").select("*").eq("user_id", user.user.id).in("date", formattedDates)
+
+    if (error) {
+      console.error("Error fetching batch nutrition:", error)
+      return []
+    }
+
+    // Map each date to its nutrition data
+    const results = formattedDates.map((date) => {
+      const record = nutritionData?.find((item) => item.date === date)
+
+      if (!record) {
+        return {
+          date,
+          calorieGoal: goals?.calorie_goal || defaultGoals.calorie_goal,
+          macroGoals: {
+            carbs: goals?.carbs_goal || defaultGoals.carbs_goal,
+            protein: goals?.protein_goal || defaultGoals.protein_goal,
+            fat: goals?.fat_goal || defaultGoals.fat_goal,
+          },
+          dailyStats: {
+            calories: {
+              food: 0,
+              exercise: 0,
+            },
+            macros: {
+              carbs: 0,
+              protein: 0,
+              fat: 0,
+            },
+          },
+          waterTrackerSettings: {
+            enabled: waterSettings?.enabled || defaultWaterSettings.enabled,
+            dailyWaterGoal: waterSettings?.daily_water_goal || defaultWaterSettings.daily_water_goal,
+            cupsConsumed: 0,
+          },
+        }
+      }
+
+      return {
+        date,
+        calorieGoal: goals?.calorie_goal || defaultGoals.calorie_goal,
+        macroGoals: {
+          carbs: goals?.carbs_goal || defaultGoals.carbs_goal,
+          protein: goals?.protein_goal || defaultGoals.protein_goal,
+          fat: goals?.fat_goal || defaultGoals.fat_goal,
+        },
+        dailyStats: {
+          calories: {
+            food: record.calories_food || 0,
+            exercise: record.calories_exercise || 0,
+          },
+          macros: {
+            carbs: record.carbs || 0,
+            protein: record.protein || 0,
+            fat: record.fat || 0,
+          },
+        },
+        waterTrackerSettings: {
+          enabled: waterSettings?.enabled || defaultWaterSettings.enabled,
+          dailyWaterGoal: waterSettings?.daily_water_goal || defaultWaterSettings.daily_water_goal,
+          cupsConsumed: record.cups_consumed || 0,
+        },
+      }
+    })
+
+    // Store in cache
+    queryCache.set(batchKey, results, 10 * 60 * 1000) // 10 minutes cache
+
+    return results
+  } catch (error) {
+    console.error("Error in getBatchNutrition:", error)
+    return []
   }
 }
 
@@ -233,31 +423,55 @@ export async function getChatMessages(date: string): Promise<Message[]> {
       return []
     }
 
-    // Convert database records to Message objects
-    // Note: imageUri/imageUrl are not stored in the database but rather in Supabase Storage
-    const messages = await Promise.all(
-      data.map(async (item) => {
-        const message: Message = {
-          id: item.timestamp,
-          type: item.message_type || "user",
-          text: item.message || "",
-          timestamp: new Date(item.timestamp),
-        }
+    // First convert basic message data without image URL fetching
+    const basicMessages = data.map((item) => ({
+      id: item.timestamp,
+      type: item.message_type || "user",
+      text: item.message || "",
+      timestamp: new Date(item.timestamp),
+    }))
 
-        // If this is an AI message, check if there's an associated image in storage
-        if (message.type === "ai") {
-          // Check for image by message ID
-          const imageUrl = await getImageUrlForMessage(message.id)
-          if (imageUrl) {
-            message.imageUrl = imageUrl
+    // Only fetch image URLs for AI messages in a batch request to reduce API calls
+    const aiMessages = basicMessages.filter((msg) => msg.type === "ai")
+    let imageResults: { [key: number]: string | null } = {}
+
+    if (aiMessages.length > 0) {
+      try {
+        // Batch search for images
+        const messageIds = aiMessages.map((msg) => `${user.user.id}_${msg.id}`)
+        const { data: imageData, error: imageError } = await supabase.storage.from("user_uploads").list("food_images", { search: user.user.id })
+
+        if (imageError) {
+          console.error("Error fetching image list:", imageError)
+        } else if (imageData) {
+          // Map image data to messages
+          for (const item of imageData) {
+            const filename = item.name
+            // Extract message ID from filename
+            for (const msgId of messageIds) {
+              if (filename.includes(msgId)) {
+                const id = parseInt(msgId.split("_")[1])
+                const filePath = `food_images/${filename}`
+                const { data: urlData } = supabase.storage.from("user_uploads").getPublicUrl(filePath)
+                imageResults[id] = urlData.publicUrl
+                break
+              }
+            }
           }
         }
+      } catch (imageListError) {
+        console.error("Error in batch image processing:", imageListError)
+      }
+    }
 
-        return message
-      }),
-    )
-
-    return messages
+    // Update messages with image URLs
+    return basicMessages.map((msg) => {
+      if (msg.type === "ai" && imageResults[msg.id]) {
+        const imageUrl = imageResults[msg.id]
+        return { ...msg, imageUrl: imageUrl || undefined }
+      }
+      return msg
+    })
   } catch (error) {
     console.error("Exception fetching chat messages:", error)
     return []

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image } from "react-native"
+import React, { useState, useEffect, useContext } from "react"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions } from "react-native"
 import { useNavigation } from "@react-navigation/native"
-import { supabase } from "../utils/supabaseClient" // Fixed typo in import
+import { supabase } from "../utils/supabaseClient"
 import { RootStackParamList } from "../types/navigation"
 import { DrawerNavigationProp } from "@react-navigation/drawer"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { AuthContext } from "../App"
 
 type AuthScreenNavigationProp = DrawerNavigationProp<RootStackParamList, "Auth">
 
@@ -14,11 +16,27 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const navigation = useNavigation<AuthScreenNavigationProp>()
+  const { setIsLoggedIn } = useContext(AuthContext)
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const { height: screenHeight } = Dimensions.get("window")
 
   // Check for existing session to auto-login
   useEffect(() => {
     checkForExistingSession()
+  }, [])
+
+  // Handle keyboard events
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true))
+    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false))
+
+    return () => {
+      keyboardDidShowListener.remove()
+      keyboardDidHideListener.remove()
+    }
   }, [])
 
   const checkForExistingSession = async () => {
@@ -28,11 +46,14 @@ export default function AuthScreen() {
         data: { session },
       } = await supabase.auth.getSession()
       if (session?.user) {
-        // Redirect to Home screen instead of Profile
+        // Update global auth state
+        setIsLoggedIn(true)
+        // Redirect to Home screen
         navigation.navigate("Home")
       }
     } catch (error: any) {
       console.error("Session check error:", error.message)
+      setIsLoggedIn(false)
     } finally {
       setLoading(false)
     }
@@ -78,7 +99,9 @@ export default function AuthScreen() {
         if (error) throw error
 
         if (data.user) {
-          // Redirect to Home screen instead of Profile
+          // Update global auth state
+          setIsLoggedIn(true)
+          // Redirect to Home screen
           navigation.navigate("Home")
         }
       } else {
@@ -107,12 +130,16 @@ export default function AuthScreen() {
           if (profileError) {
             console.error("Profile creation error:", profileError)
           }
+
+          // Don't set global auth state for signup until email verification
+          // setIsLoggedIn(true)
         }
 
         Alert.alert("Signup Successful", "Please check your email for confirmation", [{ text: "OK", onPress: () => setMode("login") }])
       }
     } catch (error: any) {
       Alert.alert(`${mode === "login" ? "Login" : "Signup"} Error`, error.message)
+      setIsLoggedIn(false)
     } finally {
       setLoading(false)
     }
@@ -146,39 +173,67 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}>
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoPlaceholderText}>Z</Text>
-            </View>
-            <Text style={styles.appName}>ZestFit</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 20}>
+        <ScrollView contentContainerStyle={[styles.scrollContainer, keyboardVisible && { paddingBottom: 120 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerSmall]}>
+            <Image
+              source={require("../assets/icons/adaptive-icon.png")}
+              style={{
+                width: keyboardVisible ? 200 : 320,
+                height: keyboardVisible ? 200 : 320,
+                alignSelf: "center",
+                marginVertical: keyboardVisible ? -30 : -70,
+                marginBottom: keyboardVisible ? -80 : -120,
+              }}
+              resizeMode="contain"
+            />
           </View>
 
-          <Text style={styles.header}>{mode === "login" ? "Welcome Back" : "Create Account"}</Text>
+          <View style={styles.headerContainer}>
+            {/* <Text style={styles.header}>{mode === "login" ? "Welcome Back" : "Create Account"}</Text> */}
+            <Text style={styles.subHeader}>{mode === "login" ? "Sign in to access your health and fitness journey" : "Join ZestFit to start your health and fitness journey"}</Text>
+          </View>
 
           <View style={styles.formContainer}>
             {mode === "signup" && (
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Full Name</Text>
-                <TextInput style={styles.input} placeholder="Enter your full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="account" size={22} color="#7A869A" style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Enter your full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
+                </View>
               </View>
             )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email</Text>
-              <TextInput style={styles.input} placeholder="your.email@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
+              <View style={styles.inputWrapper}>
+                <MaterialCommunityIcons name="email-outline" size={22} color="#7A869A" style={styles.inputIcon} />
+                <TextInput style={styles.input} placeholder="Enter your email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Password</Text>
-              <TextInput style={styles.input} placeholder="Your password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
+              <View style={styles.inputWrapper}>
+                <MaterialCommunityIcons name="lock-outline" size={22} color="#7A869A" style={styles.inputIcon} />
+                <TextInput style={styles.input} placeholder="Enter your password" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                  <MaterialCommunityIcons name={showPassword ? "eye-off" : "eye"} size={22} color="#7A869A" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {mode === "signup" && (
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Confirm Password</Text>
-                <TextInput style={styles.input} placeholder="Confirm your password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" returnKeyType="done" />
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="lock-outline" size={22} color="#7A869A" style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Confirm your password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirmPassword} autoCapitalize="none" returnKeyType="done" />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                    <MaterialCommunityIcons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color="#7A869A" />
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -190,7 +245,14 @@ export default function AuthScreen() {
           </View>
 
           <TouchableOpacity style={styles.primaryButton} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
-            {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.primaryButtonText}>{mode === "login" ? "Sign In" : "Create Account"}</Text>}
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <View style={styles.buttonContent}>
+                <MaterialCommunityIcons name={mode === "login" ? "login" : "account-plus"} size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                <Text style={styles.primaryButtonText}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
@@ -200,7 +262,10 @@ export default function AuthScreen() {
           </View>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setMode(mode === "login" ? "signup" : "login")} activeOpacity={0.8}>
-            <Text style={styles.secondaryButtonText}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
+            <View style={styles.buttonContent}>
+              <MaterialCommunityIcons name={mode === "login" ? "account-plus-outline" : "login-variant"} size={20} color="#2C3F00" style={styles.buttonIcon} />
+              <Text style={styles.secondaryButtonText}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
+            </View>
           </TouchableOpacity>
 
           <Text style={styles.termsText}>
@@ -227,37 +292,28 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: "100%",
-    marginBottom: 16,
+    marginBottom: 24,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: "#4184E4",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoPlaceholderText: {
-    fontSize: 40,
-    fontWeight: "bold",
-    color: "white",
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginTop: 8,
+  headerContainer: {
+    marginBottom: 32,
   },
   header: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 24,
+    marginBottom: 8,
     textAlign: "center",
+  },
+  subHeader: {
+    fontSize: 16,
+    color: "#666",
+    lineHeight: 22,
+    textAlign: "center",
+    marginTop: 5,
   },
   inputContainer: {
     marginBottom: 18,
@@ -268,30 +324,57 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 8,
   },
-  input: {
-    height: 52,
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#DFE1E6",
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
+    height: 52,
+  },
+  inputIcon: {
+    marginLeft: 16,
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: 52,
+    paddingHorizontal: 4,
     fontSize: 16,
     color: "#333",
   },
+  eyeIcon: {
+    padding: 12,
+  },
   forgotPasswordText: {
     textAlign: "right",
-    color: "#4184E4",
+    color: "#2C3F00",
     fontSize: 14,
     marginTop: 8,
-    marginBottom: 24,
+    marginBottom: 8,
+    fontWeight: "500",
   },
   primaryButton: {
     height: 56,
-    backgroundColor: "#4184E4",
+    backgroundColor: "#2C3F00",
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   primaryButtonText: {
     color: "#FFFFFF",
@@ -301,7 +384,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 24,
+    marginVertical: 0,
   },
   divider: {
     flex: 1,
@@ -322,9 +405,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
     backgroundColor: "#FFFFFF",
+    marginTop: 7,
   },
   secondaryButtonText: {
-    color: "#4184E4",
+    color: "#2C3F00",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -335,7 +419,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   termsLink: {
-    color: "#4184E4",
+    color: "#2C3F00",
     fontWeight: "500",
+  },
+  logoContainerSmall: {
+    marginBottom: 0,
   },
 })
