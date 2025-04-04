@@ -8,6 +8,8 @@ import ChatInterface from "../components/ChatInterface"
 import { supabase, enhancedSupabase, queryCache } from "../utils/supabaseClient"
 import { getDailyNutrition, saveDailyNutrition, getWaterTrackerSettings, saveUserGoals, saveWaterTrackerSettings } from "../utils/supabaseutils"
 import { getLocalDailyNutrition, saveLocalDailyNutrition, getLocalUserGoals, saveLocalUserGoals, getLocalWaterSettings, saveLocalWaterSettings } from "../utils/localStorage"
+import { useTheme } from "../theme"
+import { useToast } from "../utils/toast"
 
 // Define types for TypeScript
 interface User {
@@ -82,10 +84,8 @@ const getContentStyle = (height: number, insets: any) => ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   headerContainer: {
-    backgroundColor: "white",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -102,7 +102,6 @@ const styles = StyleSheet.create({
   },
   chatSection: {
     flex: 1,
-    backgroundColor: "white",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
@@ -116,7 +115,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 20,
     fontSize: 16,
-    color: "#555",
   },
   loadingContainer: {
     flex: 1,
@@ -129,20 +127,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(255,255,255,0.9)",
     justifyContent: "center",
     alignItems: "center",
   },
   loadingTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2C3F00",
     marginTop: 15,
     marginBottom: 5,
   },
   loadingSubtitle: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     paddingHorizontal: 30,
   },
@@ -153,6 +148,8 @@ const styles = StyleSheet.create({
 })
 
 export default function HomeScreen() {
+  const { theme } = useTheme()
+  const { showToast } = useToast()
   const route = useRoute<any>()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [dateSpecificData, setDateSpecificData] = useState<DateSpecificData>({})
@@ -161,6 +158,13 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
   const navigation = useNavigation<any>()
+  const insets = useSafeAreaInsets()
+  const { height } = Dimensions.get("window")
+
+  // Handle date changes from DateHeader
+  const handleDateChange = useCallback((newDate: Date) => {
+    setSelectedDate(newDate)
+  }, [])
 
   // Format the date once and memoize it
   const formattedDate = useMemo(() => {
@@ -383,18 +387,6 @@ export default function HomeScreen() {
     [selectedDate, user],
   )
 
-  // Handle date change
-  const handleDateChange = useCallback(
-    (newDate: Date) => {
-      // Only reload data if the date has actually changed
-      if (newDate.toDateString() !== selectedDate.toDateString()) {
-        setDataLoaded(false) // Mark that we need to load new data
-        setSelectedDate(newDate)
-      }
-    },
-    [selectedDate],
-  )
-
   // Update daily stats (used by ChatInterface)
   const handleUpdateStats = useCallback(
     (updateFn: (stats: StatsType) => StatsType) => {
@@ -591,77 +583,32 @@ export default function HomeScreen() {
     }
   }, [selectedDate, loadDateData, user, dataLoaded])
 
-  // Layout
-  const insets = useSafeAreaInsets()
-  const { height } = Dimensions.get("window")
-
-  // Show loading state
-  // if (isLoading && !dataLoaded) {
-  //   return (
-  //     <View style={[styles.container, styles.loadingContainer]}>
-  //       <View style={styles.loadingContent}>
-  //         <ActivityIndicator size="large" color="#2C3F00" />
-  //         <Text style={styles.loadingTitle}>Loading ZestFit</Text>
-  //         <Text style={styles.loadingSubtitle}>Preparing your nutrition data and daily insights...</Text>
-  //       </View>
-  //     </View>
-  //   )
-  // }
-
   // Main screen
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-        },
-      ]}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
 
-      <View style={styles.headerContainer}>
-        <DateHeader date={selectedDate} onDateChange={handleDateChange} onDrawerPress={() => navigation.openDrawer()} />
+      <View style={[styles.headerContainer, { backgroundColor: theme.colors.card }]}>
+        <View style={{ paddingTop: insets.top }}>
+          <DateHeader date={selectedDate} onDateChange={handleDateChange} />
+        </View>
       </View>
 
       <View style={[styles.content, getContentStyle(height, insets)]}>
         <View style={styles.statsSection}>
-          <MacroCards
-            calorieGoal={dateSpecificData.calorieGoal || 2000}
-            macroGoals={
-              dateSpecificData.macroGoals || {
-                carbs: 250,
-                protein: 150,
-                fat: 65,
-              }
-            }
-            dailyStats={
-              dateSpecificData.dailyStats || {
-                calories: { food: 0, exercise: 0 },
-                macros: { carbs: 0, protein: 0, fat: 0 },
-              }
-            }
-            waterTrackerSettings={{
-              // Prioritize the latest settings from route.params if available
-              enabled: Boolean(route.params?.waterTrackerSettings?.enabled !== undefined ? route.params.waterTrackerSettings.enabled : dateSpecificData.waterTrackerSettings?.enabled || globalWaterTrackerSettings?.enabled || false),
-              dailyWaterGoal: globalWaterTrackerSettings?.daily_water_goal || 4,
-              cupsConsumed: dateSpecificData.waterTrackerSettings?.cupsConsumed || 0,
-            }}
-            isWaterTrackerEnabled={Boolean(route.params?.waterTrackerSettings?.enabled !== undefined ? route.params.waterTrackerSettings.enabled : dateSpecificData.waterTrackerSettings?.enabled || globalWaterTrackerSettings?.enabled || false)}
-            onIncrementWater={handleIncrementWater}
-            onDecrementWater={handleDecrementWater}
-            setCalorieGoal={handleSetCalorieGoal}
-            setMacroGoals={handleSetMacroGoals}
-          />
-        </View>
-
-        <View style={styles.chatSection}>
-          <ChatInterface date={formattedDate} onUpdateStats={handleUpdateStats} user={user} />
+          <MacroCards dailyStats={dateSpecificData.dailyStats || { calories: { food: 0, exercise: 0 }, macros: { carbs: 0, protein: 0, fat: 0 } }} calorieGoal={dateSpecificData.calorieGoal || 0} macroGoals={dateSpecificData.macroGoals || { carbs: 0, protein: 0, fat: 0 }} waterTrackerSettings={dateSpecificData.waterTrackerSettings} onEditGoals={handleSetMacroGoals} onEditWater={() => navigation.navigate("WaterTracker")} />
         </View>
       </View>
+
+      {isLoading && (
+        <View style={[styles.loadingApp, { backgroundColor: theme.dark ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.9)" }]}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>Loading your nutrition data</Text>
+            <Text style={[styles.loadingSubtitle, { color: theme.colors.subtext }]}>Please wait while we fetch your latest information</Text>
+          </View>
+        </View>
+      )}
     </View>
   )
 }

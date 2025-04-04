@@ -11,6 +11,7 @@ import { MotiView } from "moti"
 import { queryCache } from "../utils/supabaseClient"
 import MacroCards from "../components/MacroCards"
 import { getLocalDailyNutrition, saveLocalDailyNutrition, getLocalUserGoals, saveLocalUserGoals, getLocalWaterSettings, saveLocalWaterSettings } from "../utils/localStorage"
+import { useTheme } from "../theme"
 
 const { width } = Dimensions.get("window")
 
@@ -47,6 +48,7 @@ interface DailyStats {
 }
 
 export default function DashboardScreen({ navigation }: NavigationProps) {
+  const { theme } = useTheme()
   const [timeframe, setTimeframe] = useState<"weekly" | "monthly">("weekly")
   const [nutritionData, setNutritionData] = useState<NutritionDataPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -352,25 +354,30 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
     )
   }
 
-  const chartConfig = {
-    backgroundColor: "#ffffff",
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: "5",
-      strokeWidth: "1",
-      stroke: "#2C3F00",
-    },
-    propsForLabels: {
-      fontSize: 10,
-    },
-  }
+  // Memoized chart config using theme colors
+  const chartConfig = useMemo(
+    () => ({
+      backgroundColor: theme.colors.card,
+      backgroundGradientFrom: theme.colors.card,
+      backgroundGradientTo: theme.colors.card,
+      decimalPlaces: 0,
+      color: (opacity = 1) => `rgba(${theme.dark ? "255, 255, 255" : "0, 0, 0"}, ${opacity})`,
+      labelColor: (opacity = 1) => `rgba(${theme.dark ? "255, 255, 255" : "0, 0, 0"}, ${opacity})`,
+      style: {
+        borderRadius: 16,
+      },
+      propsForDots: {
+        r: "5",
+        strokeWidth: "1",
+        stroke: theme.colors.primary,
+      },
+      propsForLabels: {
+        fontSize: 10,
+        fill: theme.colors.text,
+      },
+    }),
+    [theme],
+  )
 
   // Function to refresh data
   const handleRefresh = () => {
@@ -636,44 +643,45 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
             paddingBottom: insets.bottom,
             paddingLeft: insets.left,
             paddingRight: insets.right,
+            backgroundColor: theme.colors.background,
           },
         ]}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.colors.card }]}>
           <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-            <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
+            <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Nutrition Dashboard</Text>
-            {user && <Text style={styles.headerSubtitle}>Your health insights at a glance</Text>}
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Dashboard</Text>
+            {user && <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>Your health insights at a glance</Text>}
           </View>
           <TouchableOpacity disabled style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={24} color="#ccc" />
+            <MaterialCommunityIcons name="refresh" size={24} color={theme.colors.subtext} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.timeframeSelector}>
-          <TouchableOpacity disabled style={[styles.timeframeButton]}>
-            <Text style={styles.timeframeButtonText}>Weekly</Text>
+        <View style={[styles.timeframeSelector, { backgroundColor: theme.colors.background }]}>
+          <TouchableOpacity disabled style={[styles.timeframeButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
+            <Text style={[styles.timeframeButtonText, { color: theme.colors.subtext }]}>Weekly</Text>
           </TouchableOpacity>
-          <TouchableOpacity disabled style={[styles.timeframeButton]}>
-            <Text style={styles.timeframeButtonText}>Monthly</Text>
+          <TouchableOpacity disabled style={[styles.timeframeButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
+            <Text style={[styles.timeframeButtonText, { color: theme.colors.subtext }]}>Monthly</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.chartContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.performanceIndicator}>
-            <ActivityIndicator size="small" color="#2C3F00" style={{ marginRight: 8 }} />
-            <Text style={styles.performanceText}>Loading dashboard data...</Text>
+            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
+            <Text style={[styles.performanceText, { color: theme.colors.subtext }]}>Loading dashboard data...</Text>
           </View>
 
-          <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Calories</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Calories</Text>
             <RenderSkeletonChart />
           </View>
 
-          <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Macronutrients</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Macronutrients</Text>
             <RenderSkeletonChart />
           </View>
 
@@ -696,42 +704,43 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
+          backgroundColor: theme.colors.background,
         },
       ]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
+          <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Nutrition Dashboard</Text>
-          {user && <Text style={styles.headerSubtitle}>Your health insights at a glance</Text>}
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Dashboard</Text>
+          {user && <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>Your health insights at a glance</Text>}
         </View>
         <View style={styles.headerActionsContainer}>
-          <Text style={styles.lastRefreshText}>{lastRefreshText}</Text>
+          <Text style={[styles.lastRefreshText, { color: theme.colors.subtext }]}>{lastRefreshText}</Text>
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton} disabled={isRefreshing}>
-            {isRefreshing ? <ActivityIndicator size="small" color="#2C3F00" /> : <MaterialCommunityIcons name="refresh" size={24} color="#333" />}
+            {isRefreshing ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <MaterialCommunityIcons name="refresh" size={24} color={theme.colors.text} />}
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.timeframeSelector}>
-        <TouchableOpacity style={[styles.timeframeButton, timeframe === "weekly" && styles.timeframeButtonActive]} onPress={() => setTimeframe("weekly")}>
-          <Text style={[styles.timeframeButtonText, timeframe === "weekly" && styles.timeframeButtonTextActive]}>Weekly</Text>
+        <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "weekly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("weekly")}>
+          <Text style={[styles.timeframeButtonText, { color: timeframe === "weekly" ? "#ffffff" : theme.colors.subtext }]}>Weekly</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.timeframeButton, timeframe === "monthly" && styles.timeframeButtonActive]} onPress={() => setTimeframe("monthly")}>
-          <Text style={[styles.timeframeButtonText, timeframe === "monthly" && styles.timeframeButtonTextActive]}>Monthly</Text>
+        <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "monthly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("monthly")}>
+          <Text style={[styles.timeframeButtonText, { color: timeframe === "monthly" ? "#ffffff" : theme.colors.subtext }]}>Monthly</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.chartContainer} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={["#2C3F00"]} tintColor="#2C3F00" />}>
+      <ScrollView style={styles.chartContainer} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}>
         <View style={styles.performanceIndicator}>
-          <MaterialCommunityIcons name="clock-outline" size={16} color="#888" />
-          <Text style={styles.performanceText}>Last refreshed: {lastRefreshText}</Text>
+          <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.subtext} />
+          <Text style={[styles.performanceText, { color: theme.colors.subtext }]}>Last refreshed: {lastRefreshText}</Text>
         </View>
 
-        <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Calories</Text>
+        <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Calories</Text>
           {getChartData("calories") && (
             <LineChart
               data={getChartData("calories") || { labels: [], datasets: [{ data: [0], color: () => "rgba(0,0,0,0)" }] }}
@@ -759,18 +768,18 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
                       position: "absolute",
                       top: y - 30,
                       left: x - 30,
-                      backgroundColor: "white",
+                      backgroundColor: theme.colors.card,
                       padding: 4,
                       borderRadius: 8,
                       elevation: 3,
-                      shadowColor: "#000",
+                      shadowColor: theme.colors.text,
                       shadowOffset: { width: 0, height: 1 },
                       shadowOpacity: 0.2,
                       shadowRadius: 2,
                       width: 60,
                     }}
                   >
-                    <Text style={styles.dataPointLabel}>{dataPoint.calories} cal</Text>
+                    <Text style={[styles.dataPointLabel, { color: theme.colors.text }]}>{dataPoint.calories} cal</Text>
                   </MotiView>
                 ) : null
               }}
@@ -794,7 +803,7 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
                       bottom: 0,
                       left: index * ((width - 60) / nutritionData.length) + 35,
                       width: 2,
-                      backgroundColor: "rgba(44, 63, 0, 0.5)",
+                      backgroundColor: theme.colors.primary,
                     }}
                   />
                 )
@@ -803,8 +812,8 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
           )}
         </View>
 
-        <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Macronutrients</Text>
+        <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Macronutrients</Text>
           {nutritionData.length > 0 && (
             <BarChart
               data={{
@@ -865,8 +874,8 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
         </View>
 
         {selectedDataPoint && (
-          <View style={styles.selectedDayCard}>
-            <Text style={styles.selectedDayTitle}>{format(new Date(selectedDataPoint.date), "MMMM d, yyyy")}</Text>
+          <View style={[styles.selectedDayCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <Text style={[styles.selectedDayTitle, { color: theme.colors.text }]}>{format(new Date(selectedDataPoint.date), "MMMM d, yyyy")}</Text>
 
             {renderCalorieProgress()}
 
@@ -875,31 +884,31 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
                 <PieChart data={getMacroDistribution()} width={width - 40} height={180} chartConfig={chartConfig} accessor="population" backgroundColor="transparent" paddingLeft="15" absolute={false} hasLegend={false} />
               ) : (
                 <View style={styles.noDataContainer}>
-                  <Ionicons name="nutrition-outline" size={40} color="#ccc" />
-                  <Text style={styles.noDataText}>No nutrition data recorded</Text>
+                  <Ionicons name="nutrition-outline" size={40} color={theme.colors.subtext} />
+                  <Text style={[styles.noDataText, { color: theme.colors.subtext }]}>No nutrition data recorded</Text>
                 </View>
               )}
 
-              <View style={styles.macroDetailsContainer}>
-                <View style={styles.macroDetailItem} key="macro-carbs">
+              <View style={[styles.macroDetailsContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.07)" : "#f9f9f9" }]}>
+                <View style={styles.macroDetailItem}>
                   <View style={[styles.macroDetailColor, { backgroundColor: "rgba(255, 107, 107, 1)" }]} />
                   <View>
-                    <Text style={styles.macroDetailLabel}>Carbs</Text>
-                    <Text style={styles.macroDetailValue}>{selectedDataPoint.carbs}g</Text>
+                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Carbs</Text>
+                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.carbs}g</Text>
                   </View>
                 </View>
-                <View style={styles.macroDetailItem} key="macro-protein">
+                <View style={styles.macroDetailItem}>
                   <View style={[styles.macroDetailColor, { backgroundColor: "rgba(78, 205, 196, 1)" }]} />
                   <View>
-                    <Text style={styles.macroDetailLabel}>Protein</Text>
-                    <Text style={styles.macroDetailValue}>{selectedDataPoint.protein}g</Text>
+                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Protein</Text>
+                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.protein}g</Text>
                   </View>
                 </View>
-                <View style={styles.macroDetailItem} key="macro-fat">
+                <View style={styles.macroDetailItem}>
                   <View style={[styles.macroDetailColor, { backgroundColor: "rgba(255, 167, 38, 1)" }]} />
                   <View>
-                    <Text style={styles.macroDetailLabel}>Fat</Text>
-                    <Text style={styles.macroDetailValue}>{selectedDataPoint.fat}g</Text>
+                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Fat</Text>
+                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.fat}g</Text>
                   </View>
                 </View>
               </View>
@@ -908,37 +917,37 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
         )}
 
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="fire" size={24} color="#FF3B30" />
-            <Text style={styles.statLabel}>Avg. Calories</Text>
-            <Text style={styles.statValue}>{nutritionData.length > 0 ? Math.round(nutritionData.reduce((acc, curr) => acc + curr.calories, 0) / nutritionData.length) : 0}</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <MaterialCommunityIcons name="fire" size={24} color={theme.dark ? "#FF6B6B" : "#FF3B30"} />
+            <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Avg. Calories</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>{nutritionData.length > 0 ? Math.round(nutritionData.reduce((acc, curr) => acc + curr.calories, 0) / nutritionData.length) : 0}</Text>
           </View>
 
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="trending-up" size={24} color="#2C3F00" />
-            <Text style={styles.statLabel}>Highest Day</Text>
-            <Text style={styles.statValue}>{nutritionData.length > 0 ? Math.max(...nutritionData.map((item) => item.calories)) : 0}</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <MaterialCommunityIcons name="trending-up" size={24} color={theme.colors.primary} />
+            <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Highest Day</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>{nutritionData.length > 0 ? Math.max(...nutritionData.map((item) => item.calories)) : 0}</Text>
           </View>
         </View>
 
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="calendar-check" size={24} color="#007AFF" />
-            <Text style={styles.statLabel}>Current Streak</Text>
-            <Text style={styles.statValue}>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <MaterialCommunityIcons name="calendar-check" size={24} color={theme.dark ? "#64D2FF" : "#007AFF"} />
+            <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Current Streak</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
               {getStreak} {getStreak === 1 ? "day" : "days"}
             </Text>
           </View>
 
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="scale-balance" size={24} color="#5856D6" />
-            <Text style={styles.statLabel}>Avg. Protein</Text>
-            <Text style={styles.statValue}>{nutritionData.length > 0 ? Math.round(nutritionData.reduce((acc, curr) => acc + curr.protein, 0) / nutritionData.length) : 0}g</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <MaterialCommunityIcons name="scale-balance" size={24} color={theme.dark ? "#BF5AF2" : "#5856D6"} />
+            <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Avg. Protein</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>{nutritionData.length > 0 ? Math.round(nutritionData.reduce((acc, curr) => acc + curr.protein, 0) / nutritionData.length) : 0}g</Text>
           </View>
         </View>
 
         <View style={styles.macroCardsContainer}>
-          <Text style={styles.sectionTitle}>Today's Nutrition</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Nutrition</Text>
           <MacroCards calorieGoal={calorieGoalState} macroGoals={macroGoalsState} dailyStats={dailyStatsState} setCalorieGoal={handleSetCalorieGoal} setMacroGoals={handleSetMacroGoals} waterTrackerSettings={waterTrackerSettings} isWaterTrackerEnabled={waterTrackerSettings.enabled} onIncrementWater={handleIncrementWater} onDecrementWater={handleDecrementWater} />
         </View>
       </ScrollView>

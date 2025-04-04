@@ -4,6 +4,7 @@ import DateTimePickerModal from "react-native-modal-datetime-picker"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { useTheme } from "../theme"
 
 export default function WeightTrackerScreen({ navigation }) {
   const [currentWeight, setCurrentWeight] = useState(null)
@@ -15,6 +16,7 @@ export default function WeightTrackerScreen({ navigation }) {
   const [weightInput, setWeightInput] = useState("")
   const [dateInput, setDateInput] = useState(new Date())
   const [targetWeightInput, setTargetWeightInput] = useState("")
+  const { theme } = useTheme()
 
   // Load saved data on component mount
   useEffect(() => {
@@ -130,44 +132,54 @@ export default function WeightTrackerScreen({ navigation }) {
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
+          backgroundColor: theme.colors.background,
         },
       ]}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
+      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Trackers</Text>
+        <TouchableOpacity onPress={openWeightModal} style={styles.addButton}>
+          <MaterialCommunityIcons name="plus" size={28} color={theme.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Weight Tracker</Text>
-        <TouchableOpacity onPress={openWeightModal}>
-          <MaterialCommunityIcons name="plus" size={28} color="#2C3F00" />
+      </View>
+
+      {/* Segment control for switching between trackers */}
+      <View style={[styles.segmentContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
+        <TouchableOpacity style={[styles.segmentButton, styles.segmentButtonActive, { backgroundColor: theme.colors.primary }]}>
+          <MaterialCommunityIcons name="scale" size={20} color="#fff" style={styles.segmentIcon} />
+          <Text style={styles.segmentButtonTextActive}>Weight</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.segmentButton} onPress={() => navigation.navigate("WaterTracker")}>
+          <MaterialCommunityIcons name="water" size={20} color={theme.colors.subtext} style={styles.segmentIcon} />
+          <Text style={[styles.segmentButtonText, { color: theme.colors.subtext }]}>Water</Text>
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView style={styles.content} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.cardContainer}>
-          <TouchableOpacity style={styles.card} onPress={openWeightModal}>
-            <Text style={styles.cardTitle}>Current Weight</Text>
-            <Text style={styles.cardValue}>{currentWeight ? `${currentWeight.toFixed(1)} kg` : "Not Set"}</Text>
+          <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]} onPress={openWeightModal}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Current Weight</Text>
+            <Text style={[styles.cardValue, { color: theme.colors.primary }]}>{currentWeight ? `${currentWeight.toFixed(1)} kg` : "Not Set"}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card} onPress={openTargetWeightModal}>
-            <Text style={styles.cardTitle}>Target Weight</Text>
-            <Text style={styles.cardValue}>{targetWeight ? `${targetWeight.toFixed(1)} kg` : "Set Target"}</Text>
+          <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]} onPress={openTargetWeightModal}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Target Weight</Text>
+            <Text style={[styles.cardValue, { color: theme.colors.primary }]}>{targetWeight ? `${targetWeight.toFixed(1)} kg` : "Set Target"}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.logSection}>
-          <Text style={styles.logTitle}>Weight Log</Text>
+        <View style={[styles.logSection, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.logTitle, { color: theme.colors.text }]}>Weight Log</Text>
           <ScrollView>
             {weightLog.map((entry) => (
-              <View key={entry.id} style={styles.logEntry}>
+              <View key={entry.id} style={[styles.logEntry, { borderBottomColor: theme.colors.border }]}>
                 <View style={styles.logEntryContent}>
-                  <Text style={styles.logEntryText}>{new Date(entry.date).toLocaleString()}</Text>
-                  <Text style={styles.logEntryWeight}>{entry.weight} kg</Text>
+                  <Text style={[styles.logEntryText, { color: theme.colors.subtext }]}>{new Date(entry.date).toLocaleString()}</Text>
+                  <Text style={[styles.logEntryWeight, { color: theme.colors.text }]}>{entry.weight} kg</Text>
                 </View>
                 <TouchableOpacity onPress={() => deleteWeightEntry(entry.id)} style={styles.deleteButton}>
-                  <MaterialCommunityIcons name="trash-can-outline" size={20} color="red" />
+                  <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.colors.error} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -177,12 +189,34 @@ export default function WeightTrackerScreen({ navigation }) {
 
       {/* Weight Entry Modal */}
       <Modal visible={weightModalVisible} transparent={true} animationType="fade" statusBarTranslucent onRequestClose={() => setWeightModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Weight Entry</Text>
-            <TextInput style={styles.input} placeholder="Enter weight (kg)" keyboardType="numeric" value={weightInput} onChangeText={setWeightInput} />
-            <TouchableOpacity onPress={() => setDatePickerVisible(true)} style={styles.dateButton}>
-              <Text>Date: {dateInput.toLocaleString()}</Text>
+        <View style={[styles.modalContainer, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Add Weight Entry</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
+              placeholder="Enter weight (kg)"
+              keyboardType="numeric"
+              value={weightInput}
+              onChangeText={setWeightInput}
+              placeholderTextColor={theme.colors.input.placeholder}
+            />
+            <TouchableOpacity
+              onPress={() => setDatePickerVisible(true)}
+              style={[
+                styles.dateButton,
+                {
+                  backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#eee",
+                },
+              ]}
+            >
+              <Text style={{ color: theme.colors.text }}>Date: {dateInput.toLocaleString()}</Text>
             </TouchableOpacity>
             <DateTimePickerModal
               isVisible={isDatePickerVisible}
@@ -193,12 +227,13 @@ export default function WeightTrackerScreen({ navigation }) {
                 setDatePickerVisible(false)
               }}
               onCancel={() => setDatePickerVisible(false)}
+              themeVariant={theme.dark ? "dark" : "light"}
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalButton} onPress={() => setWeightModalVisible(false)}>
-                <Text>Cancel</Text>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#ddd" }]} onPress={() => setWeightModalVisible(false)}>
+                <Text style={{ color: theme.colors.text }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={saveWeightEntry}>
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={saveWeightEntry}>
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -208,15 +243,29 @@ export default function WeightTrackerScreen({ navigation }) {
 
       {/* Target Weight Modal */}
       <Modal visible={targetModalVisible} transparent={true} animationType="fade" statusBarTranslucent onRequestClose={() => setTargetModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Set Target Weight</Text>
-            <TextInput style={styles.input} placeholder="Enter target weight (kg)" keyboardType="numeric" value={targetWeightInput} onChangeText={setTargetWeightInput} />
+        <View style={[styles.modalContainer, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set Target Weight</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
+              placeholder="Enter target weight (kg)"
+              keyboardType="numeric"
+              value={targetWeightInput}
+              onChangeText={setTargetWeightInput}
+              placeholderTextColor={theme.colors.input.placeholder}
+            />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalButton} onPress={() => setTargetModalVisible(false)}>
-                <Text>Cancel</Text>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#ddd" }]} onPress={() => setTargetModalVisible(false)}>
+                <Text style={{ color: theme.colors.text }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={saveTargetWeight}>
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={saveTargetWeight}>
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -240,6 +289,38 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "bold" },
   content: { flex: 1, padding: 16 },
+  segmentContainer: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 12,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  segmentButtonActive: {
+    backgroundColor: "#2C3F00",
+  },
+  segmentButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  segmentButtonTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  segmentIcon: {
+    marginRight: 8,
+  },
+  addButton: {
+    padding: 8,
+  },
   cardContainer: {
     flexDirection: "row",
     justifyContent: "space-between",

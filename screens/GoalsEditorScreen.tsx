@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, StatusBar, TextInput, ScrollView,
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { saveUserGoals } from "../utils/supabaseutils"
+import { useTheme } from "../theme"
 
 // Using any type for now to fix linter errors
 interface MacroGoals {
@@ -23,6 +24,7 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
   const [calorieGoal, setCalorieGoal] = useState(initialCalorieGoal)
   const [macroGoals, setMacroGoals] = useState(initialMacroGoals)
   const [isSaving, setIsSaving] = useState(false)
+  const { theme } = useTheme()
 
   const handleSaveGoals = async () => {
     try {
@@ -70,35 +72,57 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
+          backgroundColor: theme.colors.background,
         },
       ]}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <View style={styles.header}>
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
+      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
+          <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Daily Goals</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Daily Goals</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Calorie Goal</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Calorie Goal</Text>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Daily Calories</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={calorieGoal.toString()} onChangeText={(text) => setCalorieGoal(parseInt(text) || 0)} placeholder="Enter daily calorie goal" />
+            <Text style={[styles.label, { color: theme.colors.text }]}>Daily Calories</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
+              keyboardType="numeric"
+              value={calorieGoal.toString()}
+              onChangeText={(text) => setCalorieGoal(parseInt(text) || 0)}
+              placeholder="Enter daily calorie goal"
+              placeholderTextColor={theme.colors.input.placeholder}
+            />
           </View>
         </View>
 
         {/* Macro Goals Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Macro Goals</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Macro Goals</Text>
 
           {/* Carbs Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Carbohydrates (g)</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Carbohydrates (g)</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
               keyboardType="numeric"
               value={macroGoals.carbs.toString()}
               onChangeText={(text) =>
@@ -108,14 +132,22 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
                 }))
               }
               placeholder="Enter daily carbs goal"
+              placeholderTextColor={theme.colors.input.placeholder}
             />
           </View>
 
           {/* Protein Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Protein (g)</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Protein (g)</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
               keyboardType="numeric"
               value={macroGoals.protein.toString()}
               onChangeText={(text) =>
@@ -125,14 +157,22 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
                 }))
               }
               placeholder="Enter daily protein goal"
+              placeholderTextColor={theme.colors.input.placeholder}
             />
           </View>
 
           {/* Fat Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Fat (g)</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Fat (g)</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
               keyboardType="numeric"
               value={macroGoals.fat.toString()}
               onChangeText={(text) =>
@@ -142,12 +182,13 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
                 }))
               }
               placeholder="Enter daily fat goal"
+              placeholderTextColor={theme.colors.input.placeholder}
             />
           </View>
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveGoals} disabled={isSaving}>
+        <TouchableOpacity style={[styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={handleSaveGoals} disabled={isSaving}>
           {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Goals</Text>}
         </TouchableOpacity>
       </ScrollView>

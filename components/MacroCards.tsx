@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import GoalSettingModal from "./GoalSettingModal"
+import { useTheme } from "../theme"
 
 interface MacroGoals {
   carbs: number
@@ -67,6 +68,7 @@ export default function MacroCards({
   onIncrementWater,
   onDecrementWater,
 }: MacroCardsProps) {
+  const { theme } = useTheme()
   const [isCalorieModalVisible, setCalorieModalVisible] = useState(false)
   const [isMacroModalVisible, setMacroModalVisible] = useState(false)
 
@@ -128,14 +130,14 @@ export default function MacroCards({
     const progress = Math.min(100, Math.max(0, (current / goal) * 100))
 
     return (
-      <TouchableOpacity style={styles.macroCard} onPress={onPress}>
+      <TouchableOpacity style={[styles.macroCard, { backgroundColor: theme.colors.card }]} onPress={onPress}>
         <View style={styles.macroCardHeader}>
           <MaterialCommunityIcons name={icon} size={20} color={color} />
-          <Text style={styles.macroCardTitle}>{title}</Text>
+          <Text style={[styles.macroCardTitle, { color: theme.colors.text }]}>{title}</Text>
         </View>
 
         <View style={styles.macroCardContent}>
-          <View style={styles.macroProgressContainer}>
+          <View style={[styles.macroProgressContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#E9E9E9" }]}>
             <View
               style={[
                 styles.macroProgressBar,
@@ -149,7 +151,7 @@ export default function MacroCards({
 
           <View style={styles.macroValueContainer}>
             <Text style={[styles.macroCurrentValue, { color }]}>{Math.round(current)}g</Text>
-            <Text style={styles.macroGoalValue}>/ {Math.round(goal)}g</Text>
+            <Text style={[styles.macroGoalValue, { color: theme.colors.subtext }]}>/ {Math.round(goal)}g</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -170,37 +172,37 @@ export default function MacroCards({
     const progress = Math.min(100, Math.max(0, (cupsConsumed / dailyWaterGoal) * 100))
 
     return (
-      <View style={styles.waterCard}>
+      <View style={[styles.waterCard, { backgroundColor: theme.colors.card }]}>
         <View style={styles.waterCardHeader}>
-          <MaterialCommunityIcons name="water" size={18} color="#2C3F00" />
-          <Text style={styles.waterCardTitle}>Water</Text>
-          <Text style={styles.waterLitersText}>{(cupsConsumed * 0.25).toFixed(1)}L</Text>
+          <MaterialCommunityIcons name="water" size={18} color={theme.colors.primary} />
+          <Text style={[styles.waterCardTitle, { color: theme.colors.text }]}>Water</Text>
+          <Text style={[styles.waterLitersText, { color: theme.colors.subtext }]}>{(cupsConsumed * 0.25).toFixed(1)}L</Text>
         </View>
 
         <View style={styles.waterMainContent}>
-          <View style={styles.waterProgressContainer}>
+          <View style={[styles.waterProgressContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#E9E9E9" }]}>
             <View
               style={[
                 styles.waterProgressBar,
                 {
                   width: `${progress}%`,
-                  backgroundColor: "#2C3F00",
+                  backgroundColor: theme.colors.primary,
                 },
               ]}
             />
           </View>
 
           <View style={styles.waterCardControls}>
-            <TouchableOpacity style={styles.waterControlButton} onPress={onDecrementWater} disabled={cupsConsumed === 0}>
-              <MaterialCommunityIcons name="minus" size={14} color={cupsConsumed === 0 ? "#CCCCCC" : "#2C3F00"} />
+            <TouchableOpacity style={[styles.waterControlButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "#F5F5F5" }]} onPress={onDecrementWater} disabled={cupsConsumed === 0}>
+              <MaterialCommunityIcons name="minus" size={14} color={cupsConsumed === 0 ? (theme.dark ? "#3A3A3C" : "#CCCCCC") : theme.colors.primary} />
             </TouchableOpacity>
 
-            <Text style={styles.waterCountText}>
+            <Text style={[styles.waterCountText, { color: theme.colors.text }]}>
               {cupsConsumed}/{dailyWaterGoal}
             </Text>
 
-            <TouchableOpacity style={styles.waterControlButton} onPress={onIncrementWater} disabled={cupsConsumed === dailyWaterGoal}>
-              <MaterialCommunityIcons name="plus" size={14} color={cupsConsumed === dailyWaterGoal ? "#CCCCCC" : "#2C3F00"} />
+            <TouchableOpacity style={[styles.waterControlButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "#F5F5F5" }]} onPress={onIncrementWater} disabled={cupsConsumed === dailyWaterGoal}>
+              <MaterialCommunityIcons name="plus" size={14} color={cupsConsumed === dailyWaterGoal ? (theme.dark ? "#3A3A3C" : "#CCCCCC") : theme.colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -213,43 +215,72 @@ export default function MacroCards({
       {/* Top Row with Calorie and Macro Cards */}
       <View style={styles.topRow}>
         {/* Calorie Card */}
-        <TouchableOpacity style={[styles.card, styles.calorieCard]} onPress={() => setCalorieModalVisible(true)}>
+        <TouchableOpacity
+          style={[
+            styles.card,
+            styles.calorieCard,
+            {
+              backgroundColor: theme.colors.card,
+              shadowColor: theme.colors.text,
+            },
+          ]}
+          onPress={() => setCalorieModalVisible(true)}
+        >
           <View style={styles.calorieCardHeader}>
             <MaterialCommunityIcons name="fire" size={22} color="#e39454" />
-            <Text style={styles.cardTitle}>Calories</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Calories</Text>
           </View>
           <View style={styles.calorieContent}>
-            <Text style={[styles.calorieMainText, { color: remainingCalories < 0 ? "#FF3B30" : "#2C3F00" }]}>{totalCalories}</Text>
-            <Text style={styles.calorieSubText}>/ {safeCalorieGoal}</Text>
+            <Text style={[styles.calorieMainText, { color: remainingCalories < 0 ? theme.colors.error : theme.colors.primary }]}>{totalCalories}</Text>
+            <Text style={[styles.calorieSubText, { color: theme.colors.subtext }]}>/ {safeCalorieGoal}</Text>
           </View>
-          <View style={styles.calorieSeparator} />
+          <View style={[styles.calorieSeparator, { backgroundColor: theme.colors.border }]} />
           <View style={styles.calorieDetailContainer}>
             <View style={styles.detailItem}>
               <MaterialCommunityIcons name="food" size={16} color="#4ECDC4" />
-              <Text style={styles.detailLabel}>+{safeCaloriesFood} </Text>
+              <Text style={[styles.detailLabel, { color: theme.colors.subtext }]}>+{safeCaloriesFood} </Text>
             </View>
             <View style={styles.detailItem}>
               <MaterialCommunityIcons name="run" size={16} color="#FF6B6B" />
-              <Text style={styles.detailLabel}>-{safeCaloriesExercise}</Text>
+              <Text style={[styles.detailLabel, { color: theme.colors.subtext }]}>-{safeCaloriesExercise}</Text>
             </View>
             <View style={styles.remainingContainer}>
-              <Text style={[styles.remainingText, { color: remainingCalories < 0 ? "#FF3B30" : remainingCalories < 200 ? "#FFA726" : "#4ECDC4" }]}>{remainingCalories > 0 ? remainingCalories + " left" : Math.abs(remainingCalories) + " over"}</Text>
+              <Text
+                style={[
+                  styles.remainingText,
+                  {
+                    color: remainingCalories < 0 ? theme.colors.error : remainingCalories < 200 ? theme.colors.warning : theme.colors.success,
+                  },
+                ]}
+              >
+                {remainingCalories > 0 ? remainingCalories + " left" : Math.abs(remainingCalories) + " over"}
+              </Text>
             </View>
           </View>
         </TouchableOpacity>
 
         {/* Macro Card */}
-        <TouchableOpacity style={[styles.card, styles.macroSummaryCard]} onPress={() => setMacroModalVisible(true)}>
+        <TouchableOpacity
+          style={[
+            styles.card,
+            styles.macroSummaryCard,
+            {
+              backgroundColor: theme.colors.card,
+              shadowColor: theme.colors.text,
+            },
+          ]}
+          onPress={() => setMacroModalVisible(true)}
+        >
           <View style={styles.macroCardHeader}>
-            <MaterialCommunityIcons name="progress-check" size={22} color="#2C3F00" />
-            <Text style={styles.cardTitle}>Macros</Text>
+            <MaterialCommunityIcons name="progress-check" size={22} color={theme.colors.primary} />
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Macros</Text>
           </View>
 
           <View style={styles.macroValues}>
             <View style={styles.macroRow}>
               <MaterialCommunityIcons name="bread-slice" size={16} color="#e39454" />
-              <Text style={styles.macroLabel}>Carbs</Text>
-              <View style={styles.macroProgressMini}>
+              <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Carbs</Text>
+              <View style={[styles.macroProgressMini, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#E9E9E9" }]}>
                 <View
                   style={[
                     styles.macroProgressBarMini,
@@ -262,14 +293,14 @@ export default function MacroCards({
               </View>
               <Text style={styles.macroValueText}>
                 <Text style={[styles.macroCurrentText, { color: "#FF6B6B" }]}>{safeCarbsCurrent}</Text>
-                <Text style={styles.macroSlashText}> / </Text>
-                <Text style={styles.macroGoalText}>{safeCarbsGoal}g</Text>
+                <Text style={[styles.macroSlashText, { color: theme.colors.subtext }]}> / </Text>
+                <Text style={[styles.macroGoalText, { color: theme.colors.subtext }]}>{safeCarbsGoal}g</Text>
               </Text>
             </View>
             <View style={styles.macroRow}>
               <MaterialCommunityIcons name="food-steak" size={16} color="#4ECDC4" />
-              <Text style={styles.macroLabel}>Protein</Text>
-              <View style={styles.macroProgressMini}>
+              <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Protein</Text>
+              <View style={[styles.macroProgressMini, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#E9E9E9" }]}>
                 <View
                   style={[
                     styles.macroProgressBarMini,
@@ -282,14 +313,14 @@ export default function MacroCards({
               </View>
               <Text style={styles.macroValueText}>
                 <Text style={[styles.macroCurrentText, { color: "#4ECDC4" }]}>{safeProteinCurrent}</Text>
-                <Text style={styles.macroSlashText}> / </Text>
-                <Text style={styles.macroGoalText}>{safeProteinGoal}g</Text>
+                <Text style={[styles.macroSlashText, { color: theme.colors.subtext }]}> / </Text>
+                <Text style={[styles.macroGoalText, { color: theme.colors.subtext }]}>{safeProteinGoal}g</Text>
               </Text>
             </View>
             <View style={styles.macroRow}>
               <MaterialCommunityIcons name="human" size={16} color="#FFA726" />
-              <Text style={styles.macroLabel}>Fat</Text>
-              <View style={styles.macroProgressMini}>
+              <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Fat</Text>
+              <View style={[styles.macroProgressMini, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#E9E9E9" }]}>
                 <View
                   style={[
                     styles.macroProgressBarMini,
@@ -302,8 +333,8 @@ export default function MacroCards({
               </View>
               <Text style={styles.macroValueText}>
                 <Text style={[styles.macroCurrentText, { color: "#FFA726" }]}>{safeFatCurrent}</Text>
-                <Text style={styles.macroSlashText}> / </Text>
-                <Text style={styles.macroGoalText}>{safeFatGoal}g</Text>
+                <Text style={[styles.macroSlashText, { color: theme.colors.subtext }]}> / </Text>
+                <Text style={[styles.macroGoalText, { color: theme.colors.subtext }]}>{safeFatGoal}g</Text>
               </Text>
             </View>
           </View>

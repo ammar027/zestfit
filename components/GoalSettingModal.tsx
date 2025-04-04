@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from "react-native"
+import { useTheme } from "../theme"
 
 interface GoalSettingModalProps {
   visible: boolean
@@ -17,31 +18,84 @@ interface GoalSettingModalProps {
 
 export default function GoalSettingModal({ visible, onClose, type, goals, onSave, isGlobalGoal = true }: GoalSettingModalProps) {
   const [localGoals, setLocalGoals] = useState(goals)
+  const { theme } = useTheme()
 
   return (
     <Modal visible={visible} transparent={true} animationType="fade" statusBarTranslucent>
       <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Set {type === "calories" ? "Calorie" : "Macro"} Goals</Text>
+        <View style={[styles.modalContent, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
+          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set {type === "calories" ? "Calorie" : "Macro"} Goals</Text>
 
           {type === "calories" ? (
             <View style={styles.inputContainer}>
-              <Text>Daily Calorie Goal:</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.calories)} onChangeText={(text) => setLocalGoals({ ...localGoals, calories: parseInt(text) || 0 })} />
+              <Text style={{ color: theme.colors.text }}>Daily Calorie Goal:</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.input.background,
+                    color: theme.colors.input.text,
+                  },
+                ]}
+                keyboardType="numeric"
+                value={String(localGoals.calories)}
+                onChangeText={(text) => setLocalGoals({ ...localGoals, calories: parseInt(text) || 0 })}
+                placeholderTextColor={theme.colors.input.placeholder}
+              />
             </View>
           ) : (
             <>
               <View style={styles.inputContainer}>
-                <Text>Carbs (g):</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.carbs)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, carbs: parseInt(text) || 0 }))} />
+                <Text style={{ color: theme.colors.text }}>Carbs (g):</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.input.background,
+                      color: theme.colors.input.text,
+                    },
+                  ]}
+                  keyboardType="numeric"
+                  value={String(localGoals.carbs)}
+                  onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, carbs: parseInt(text) || 0 }))}
+                  placeholderTextColor={theme.colors.input.placeholder}
+                />
               </View>
               <View style={styles.inputContainer}>
-                <Text>Protein (g):</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.protein)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, protein: parseInt(text) || 0 }))} />
+                <Text style={{ color: theme.colors.text }}>Protein (g):</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.input.background,
+                      color: theme.colors.input.text,
+                    },
+                  ]}
+                  keyboardType="numeric"
+                  value={String(localGoals.protein)}
+                  onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, protein: parseInt(text) || 0 }))}
+                  placeholderTextColor={theme.colors.input.placeholder}
+                />
               </View>
               <View style={styles.inputContainer}>
-                <Text>Fat (g):</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={String(localGoals.fat)} onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, fat: parseInt(text) || 0 }))} />
+                <Text style={{ color: theme.colors.text }}>Fat (g):</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.input.background,
+                      color: theme.colors.input.text,
+                    },
+                  ]}
+                  keyboardType="numeric"
+                  value={String(localGoals.fat)}
+                  onChangeText={(text) => setLocalGoals((prev) => ({ ...prev, fat: parseInt(text) || 0 }))}
+                  placeholderTextColor={theme.colors.input.placeholder}
+                />
               </View>
             </>
           )}
@@ -49,10 +103,10 @@ export default function GoalSettingModal({ visible, onClose, type, goals, onSave
           {/* <Text style={styles.noteText}>Note: These changes will update your goals for all days.</Text> */}
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={onClose}>
-              <Text style={styles.buttonText}>Cancel</Text>
+            <TouchableOpacity style={[styles.button, { borderColor: theme.colors.border }]} onPress={onClose}>
+              <Text style={[styles.buttonText, { color: theme.colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={() => onSave(localGoals)}>
+            <TouchableOpacity style={[styles.button, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={() => onSave(localGoals)}>
               <Text style={[styles.buttonText, styles.saveButtonText]}>Save</Text>
             </TouchableOpacity>
           </View>

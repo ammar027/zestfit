@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker"
 import { getChatMessages, saveChatMessages, uploadImage, deleteMessage, saveDailyNutrition } from "../utils/supabaseutils"
 import { saveLocalChatMessages, getLocalChatMessages, deleteLocalChatMessage } from "../utils/localStorage"
 import { queryCache } from "../utils/supabaseClient"
+import { useTheme } from "../theme"
 
 // Define types for the component props and state
 interface ChatInterfaceProps {
@@ -76,6 +77,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [initialLayout, setInitialLayout] = useState(false)
+  const { theme } = useTheme()
 
   // Cache the date in a ref to detect changes
   const dateRef = useRef(date)
@@ -996,11 +998,11 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const EmptyState = useMemo(
     () => (
       <View style={styles.emptyStateContainer}>
-        <MaterialCommunityIcons name="food-apple" size={40} color="#ccc" />
-        <Text style={styles.emptyStateText}>Track your meals and exercises by typing them here or uploading food photos</Text>
+        <MaterialCommunityIcons name="food-apple" size={40} color={theme.colors.primary + "80"} />
+        <Text style={[styles.emptyStateText, { color: theme.colors.subtext }]}>Track your meals and exercises by typing them here or uploading food photos</Text>
       </View>
     ),
-    [],
+    [theme],
   )
 
   // Memoize the message rendering function for better list performance
@@ -1012,17 +1014,33 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
         <View key={msg.id} style={[styles.messageWrapper, isUser ? styles.userMessageWrapper : styles.aiMessageWrapper, { zIndex: isUser ? 1 : 0 }]}>
           {/* Bot Avatar - Only show for AI messages */}
           {!isUser && (
-            <View style={styles.botAvatar}>
+            <View style={[styles.botAvatar, { backgroundColor: theme.colors.primary }]}>
               <Image source={require("../assets/icons/adaptive-icon-dark.png")} style={styles.avatarImage} />
             </View>
           )}
 
           {/* Message Content */}
-          <TouchableOpacity activeOpacity={0.8} onLongPress={(event) => isUser && handleShowMenu(msg.id, event)} style={[styles.messageContent, isUser ? styles.userMessageContent : styles.aiMessageContent, editingMessage?.id === msg.id && (styles as any).messageEditing]}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onLongPress={(event) => isUser && handleShowMenu(msg.id, event)}
+            style={[
+              styles.messageContent,
+              isUser
+                ? [styles.userMessageContent, { backgroundColor: theme.colors.primary + "30" }]
+                : [
+                    styles.aiMessageContent,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderLeftColor: theme.colors.primary,
+                    },
+                  ],
+              editingMessage?.id === msg.id && (styles as any).messageEditing,
+            ]}
+          >
             {/* Menu button for user messages */}
             {isUser && (
               <TouchableOpacity style={styles.menuButton} onPress={(event) => handleShowMenu(msg.id, event)} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                <MaterialCommunityIcons name="dots-vertical" size={16} color="rgba(0,0,0,0.4)" />
+                <MaterialCommunityIcons name="dots-vertical" size={16} color={theme.colors.subtext} />
               </TouchableOpacity>
             )}
 
@@ -1039,7 +1057,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                 />
                 {activeMessageId === msg.id && (
                   <View style={styles.imageLoadingIndicator}>
-                    <ActivityIndicator size="small" color="#2C3F00" />
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
                   </View>
                 )}
               </View>
@@ -1051,7 +1069,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
               if (line.includes("*")) {
                 const parts = line.split("*")
                 return (
-                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText]}>
+                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText, { color: theme.colors.text }]}>
                     {parts.map((part, pIndex) => {
                       // Every second part (odd index) is bold
                       return pIndex % 2 === 1 ? (
@@ -1069,21 +1087,21 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
               // Render bullet points with proper formatting
               if (line.trim().startsWith("•")) {
                 return (
-                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText, styles.bulletItem]}>
+                  <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText, styles.bulletItem, { color: theme.colors.text }]}>
                     {line}
                   </Text>
                 )
               }
 
               return (
-                <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText]}>
+                <Text key={`line-${index}`} style={[styles.messageText, !isUser && styles.aiMessageText, { color: theme.colors.text }]}>
                   {line}
                 </Text>
               )
             })}
 
             {/* Message Time with real timestamp */}
-            <Text style={styles.messageTime}>{formatMessageTime(msg.timestamp)}</Text>
+            <Text style={[styles.messageTime, { color: theme.colors.subtext }]}>{formatMessageTime(msg.timestamp)}</Text>
 
             {/* Editing Indicator */}
             {editingMessage?.id === msg.id && (
@@ -1095,11 +1113,11 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
         </View>
       )
     },
-    [editingMessage, handleShowMenu, activeMessageId],
+    [editingMessage, handleShowMenu, activeMessageId, theme],
   )
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} contentContainerStyle={{ flex: 1 }}>
+    <KeyboardAvoidingView style={[styles.container, { backgroundColor: theme.colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} contentContainerStyle={{ flex: 1 }}>
       <ScrollView ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} style={styles.messagesContainer} contentContainerStyle={[messages.length === 0 ? styles.centerContent : null, { paddingBottom: keyboardVisible ? (keyboardHeight > 0 ? keyboardHeight + 60 : 160) : 40 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" onLayout={() => setInitialLayout(true)}>
         {messages.length === 0 ? EmptyState : messages.map(renderMessage)}
       </ScrollView>
@@ -1116,6 +1134,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                     position: "absolute",
                     top: menuPosition.top,
                     right: menuPosition.right,
+                    backgroundColor: theme.colors.card,
                   },
                 ]}
               >
@@ -1126,10 +1145,10 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                     setMenuPosition(null)
                   }}
                 >
-                  <MaterialCommunityIcons name="pencil" size={16} color="#333" />
-                  <Text style={(styles as ExtendedStyles).menuItemText}>Edit</Text>
+                  <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.text} />
+                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: theme.colors.text }]}>Edit</Text>
                 </TouchableOpacity>
-                <View style={(styles as ExtendedStyles).menuDivider} />
+                <View style={[(styles as ExtendedStyles).menuDivider, { backgroundColor: theme.colors.border }]} />
                 <TouchableOpacity
                   style={(styles as ExtendedStyles).menuItem}
                   onPress={() => {
@@ -1137,8 +1156,8 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                     setMenuPosition(null)
                   }}
                 >
-                  <MaterialCommunityIcons name="delete" size={16} color="#2C3F00" />
-                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: "#2C3F00" }]}>Delete</Text>
+                  <MaterialCommunityIcons name="delete" size={16} color={theme.colors.error} />
+                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: theme.colors.error }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1149,19 +1168,19 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
       {/* Image Preview Modal - Enhanced with zoom capabilities */}
       <Modal animationType="fade" transparent={true} visible={showPreview} onRequestClose={() => setShowPreview(false)}>
         <View style={styles.previewModalContainer}>
-          <View style={styles.previewModal}>
-            <Text style={styles.previewTitle}>{editingMessage ? "Update Image" : "Food Image Preview"}</Text>
+          <View style={[styles.previewModal, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{editingMessage ? "Update Image" : "Food Image Preview"}</Text>
             {imagePreview && (
               <View style={styles.previewImageContainer}>
                 <Image source={{ uri: imagePreview }} style={styles.previewImage} resizeMode="contain" />
-                <Text style={styles.previewCaption}>Tap the image to analyze its nutritional content</Text>
+                <Text style={[styles.previewCaption, { color: theme.colors.subtext }]}>Tap the image to analyze its nutritional content</Text>
               </View>
             )}
             <View style={styles.previewButtons}>
-              <TouchableOpacity style={[styles.previewButton, styles.continueButton]} onPress={() => setShowPreview(false)}>
+              <TouchableOpacity style={[styles.previewButton, styles.continueButton, { backgroundColor: theme.colors.primary }]} onPress={() => setShowPreview(false)}>
                 <Text style={styles.previewButtonText}>{editingMessage ? "Continue Editing" : "Use This Image"}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.previewButton, styles.cancelButton]} onPress={clearSelectedImage}>
+              <TouchableOpacity style={[styles.previewButton, styles.cancelButton, { backgroundColor: theme.colors.error }]} onPress={clearSelectedImage}>
                 <Text style={styles.previewButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -1173,20 +1192,38 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
       {selectedImage && !showPreview && (
         <View style={styles.selectedImageContainer}>
           <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
-          <TouchableOpacity style={styles.clearImageButton} onPress={clearSelectedImage}>
+          <TouchableOpacity style={[styles.clearImageButton, { backgroundColor: theme.colors.primary }]} onPress={clearSelectedImage}>
             <MaterialCommunityIcons name="close" size={18} color="white" />
           </TouchableOpacity>
         </View>
       )}
 
       {/* Input Area */}
-      <View style={[styles.inputContainer, keyboardVisible && styles.inputContainerWithKeyboard]}>
-        <View style={styles.inputWrapper}>
+      <View
+        style={[
+          styles.inputContainer,
+          keyboardVisible && styles.inputContainerWithKeyboard,
+          {
+            backgroundColor: theme.colors.card,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.inputWrapper,
+            {
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.input.background,
+            },
+          ]}
+        >
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: theme.colors.input.text }]}
             value={message}
             onChangeText={setMessage}
             placeholder={editingMessage ? "Edit your message..." : selectedImage ? "Add a description (optional)" : "What did you eat or exercise?"}
+            placeholderTextColor={theme.colors.input.placeholder}
             multiline={true}
             blurOnSubmit={false}
             onFocus={() => {
@@ -1198,14 +1235,14 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
           />
           <View style={styles.imageButtons}>
             <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-              <MaterialCommunityIcons name="image" size={22} color="#666" />
+              <MaterialCommunityIcons name="image" size={22} color={theme.colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
-              <MaterialCommunityIcons name="camera" size={22} color="#666" />
+              <MaterialCommunityIcons name="camera" size={22} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity style={[styles.sendButton, !message.trim() && !selectedImage && styles.sendButtonDisabled, uploading && styles.sendButtonUploading, editingMessage && styles.editButton]} onPress={handleSend} disabled={(!message.trim() && !selectedImage) || uploading}>
+        <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.colors.primary }, !message.trim() && !selectedImage && [styles.sendButtonDisabled, { backgroundColor: theme.colors.primary + "50" }], uploading && [styles.sendButtonUploading, { backgroundColor: theme.colors.primary + "70" }], editingMessage && [styles.editButton, { backgroundColor: theme.colors.success }]]} onPress={handleSend} disabled={(!message.trim() && !selectedImage) || uploading}>
           {uploading ? <ActivityIndicator size="small" color="white" /> : <MaterialCommunityIcons name={editingMessage ? "check" : "send"} size={22} color="white" />}
         </TouchableOpacity>
       </View>
@@ -1369,9 +1406,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    backgroundColor: "white",
+    top: -80,
+    borderWidth: 1,
+    borderRadius: 20,
     minHeight: 56,
     paddingBottom: Platform.OS === "ios" ? 16 : 12,
     position: "relative",
@@ -1380,8 +1417,7 @@ const styles = StyleSheet.create({
   },
   inputContainerWithKeyboard: {
     backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    borderWidth: 1,
     paddingBottom: Platform.OS === "ios" ? 30 : 20,
     position: "relative",
     bottom: 0,

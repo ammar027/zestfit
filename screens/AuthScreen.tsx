@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useContext } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions } from "react-native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions, Animated } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { supabase } from "../utils/supabaseClient"
 import { RootStackParamList } from "../types/navigation"
 import { DrawerNavigationProp } from "@react-navigation/drawer"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { AuthContext } from "../App"
+import { useTheme } from "../theme"
 
 type AuthScreenNavigationProp = DrawerNavigationProp<RootStackParamList, "Auth">
 
 export default function AuthScreen() {
+  const { theme } = useTheme()
   const [mode, setMode] = useState("login") // or 'signup'
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -22,6 +24,26 @@ export default function AuthScreen() {
   const { setIsLoggedIn } = useContext(AuthContext)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const { height: screenHeight } = Dimensions.get("window")
+
+  // Animation values
+  const fadeAnim = React.useRef(new Animated.Value(0)).current
+  const slideAnim = React.useRef(new Animated.Value(20)).current
+
+  // Start fade-in animation on component mount
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [])
 
   // Check for existing session to auto-login
   useEffect(() => {
@@ -38,6 +60,22 @@ export default function AuthScreen() {
       keyboardDidHideListener.remove()
     }
   }, [])
+
+  // Animation when switching between login/signup modes
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 0.5,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [mode])
 
   const checkForExistingSession = async () => {
     try {
@@ -172,7 +210,7 @@ export default function AuthScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 20}>
         <ScrollView contentContainerStyle={[styles.scrollContainer, keyboardVisible && { paddingBottom: 120 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerSmall]}>
@@ -189,49 +227,80 @@ export default function AuthScreen() {
             />
           </View>
 
-          <View style={styles.headerContainer}>
-            {/* <Text style={styles.header}>{mode === "login" ? "Welcome Back" : "Create Account"}</Text> */}
-            <Text style={styles.subHeader}>{mode === "login" ? "Sign in to access your health and fitness journey" : "Join ZestFit to start your health and fitness journey"}</Text>
-          </View>
+          <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <Text style={[styles.subHeader, { color: theme.colors.subtext }]}>{mode === "login" ? "Sign in to access your health and fitness journey" : "Join ZestFit to start your health and fitness journey"}</Text>
+          </Animated.View>
 
-          <View style={styles.formContainer}>
+          <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             {mode === "signup" && (
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Full Name</Text>
-                <View style={styles.inputWrapper}>
-                  <MaterialCommunityIcons name="account" size={22} color="#7A869A" style={styles.inputIcon} />
-                  <TextInput style={styles.input} placeholder="Enter your full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Full Name</Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      borderColor: theme.colors.input.border,
+                      backgroundColor: theme.colors.input.background,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="account" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                  <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your full name" placeholderTextColor={theme.colors.input.placeholder} value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
                 </View>
               </View>
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <View style={styles.inputWrapper}>
-                <MaterialCommunityIcons name="email-outline" size={22} color="#7A869A" style={styles.inputIcon} />
-                <TextInput style={styles.input} placeholder="Enter your email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    borderColor: theme.colors.input.border,
+                    backgroundColor: theme.colors.input.background,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="email-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your email" placeholderTextColor={theme.colors.input.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
               </View>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <View style={styles.inputWrapper}>
-                <MaterialCommunityIcons name="lock-outline" size={22} color="#7A869A" style={styles.inputIcon} />
-                <TextInput style={styles.input} placeholder="Enter your password" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    borderColor: theme.colors.input.border,
+                    backgroundColor: theme.colors.input.background,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your password" placeholderTextColor={theme.colors.input.placeholder} value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                  <MaterialCommunityIcons name={showPassword ? "eye-off" : "eye"} size={22} color="#7A869A" />
+                  <MaterialCommunityIcons name={showPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
                 </TouchableOpacity>
               </View>
             </View>
 
             {mode === "signup" && (
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Confirm Password</Text>
-                <View style={styles.inputWrapper}>
-                  <MaterialCommunityIcons name="lock-outline" size={22} color="#7A869A" style={styles.inputIcon} />
-                  <TextInput style={styles.input} placeholder="Confirm your password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirmPassword} autoCapitalize="none" returnKeyType="done" />
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Confirm Password</Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      borderColor: theme.colors.input.border,
+                      backgroundColor: theme.colors.input.background,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                  <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Confirm your password" placeholderTextColor={theme.colors.input.placeholder} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirmPassword} autoCapitalize="none" returnKeyType="done" />
                   <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                    <MaterialCommunityIcons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color="#7A869A" />
+                    <MaterialCommunityIcons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -239,38 +308,50 @@ export default function AuthScreen() {
 
             {mode === "login" && (
               <TouchableOpacity onPress={handleForgotPassword}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>Forgot Password?</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </Animated.View>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <View style={styles.buttonContent}>
-                <MaterialCommunityIcons name={mode === "login" ? "login" : "account-plus"} size={20} color="#FFFFFF" style={styles.buttonIcon} />
-                <Text style={styles.primaryButtonText}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.colors.button.primary }]} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <View style={styles.buttonContent}>
+                  <MaterialCommunityIcons name={mode === "login" ? "login" : "account-plus"} size={20} color={theme.colors.button.text} style={styles.buttonIcon} />
+                  <Text style={[styles.primaryButtonText, { color: theme.colors.button.text }]}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.divider} />
-          </View>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => setMode(mode === "login" ? "signup" : "login")} activeOpacity={0.8}>
-            <View style={styles.buttonContent}>
-              <MaterialCommunityIcons name={mode === "login" ? "account-plus-outline" : "login-variant"} size={20} color="#2C3F00" style={styles.buttonIcon} />
-              <Text style={styles.secondaryButtonText}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
+            <View style={styles.dividerContainer}>
+              <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+              <Text style={[styles.dividerText, { color: theme.colors.subtext }]}>OR</Text>
+              <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
             </View>
-          </TouchableOpacity>
 
-          <Text style={styles.termsText}>
-            By continuing, you agree to our <Text style={styles.termsLink}>Terms of Service</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
-          </Text>
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                {
+                  backgroundColor: theme.colors.button.secondary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+              onPress={() => setMode(mode === "login" ? "signup" : "login")}
+              activeOpacity={0.8}
+            >
+              <View style={styles.buttonContent}>
+                <MaterialCommunityIcons name={mode === "login" ? "account-plus-outline" : "login-variant"} size={20} color={theme.colors.text} style={styles.buttonIcon} />
+                <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <Text style={[styles.termsText, { color: theme.colors.subtext }]}>
+              By continuing, you agree to our <Text style={[styles.termsLink, { color: theme.colors.primary }]}>Terms of Service</Text> and <Text style={[styles.termsLink, { color: theme.colors.primary }]}>Privacy Policy</Text>
+            </Text>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -280,7 +361,6 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFC",
   },
   keyboardView: {
     flex: 1,
@@ -298,19 +378,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
+  logoContainerSmall: {
+    marginBottom: 0,
+  },
   headerContainer: {
     marginBottom: 32,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-    textAlign: "center",
-  },
   subHeader: {
     fontSize: 16,
-    color: "#666",
     lineHeight: 22,
     textAlign: "center",
     marginTop: 5,
@@ -321,16 +396,13 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#DFE1E6",
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
     height: 52,
   },
   inputIcon: {
@@ -342,14 +414,12 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 4,
     fontSize: 16,
-    color: "#333",
   },
   eyeIcon: {
     padding: 12,
   },
   forgotPasswordText: {
     textAlign: "right",
-    color: "#2C3F00",
     fontSize: 14,
     marginTop: 8,
     marginBottom: 8,
@@ -357,7 +427,6 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     height: 56,
-    backgroundColor: "#2C3F00",
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
@@ -368,6 +437,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  secondaryButton: {
+    height: 56,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    marginBottom: 16,
+  },
   buttonContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,52 +454,34 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: "600",
   },
   dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 0,
+    marginVertical: 16,
   },
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: "#DFE1E6",
   },
   dividerText: {
     paddingHorizontal: 16,
-    color: "#7A869A",
     fontSize: 14,
-  },
-  secondaryButton: {
-    height: 56,
-    borderWidth: 1,
-    borderColor: "#DFE1E6",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-    backgroundColor: "#FFFFFF",
-    marginTop: 7,
-  },
-  secondaryButtonText: {
-    color: "#2C3F00",
-    fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   termsText: {
-    textAlign: "center",
-    color: "#7A869A",
     fontSize: 12,
+    textAlign: "center",
+    marginTop: 16,
     lineHeight: 18,
   },
   termsLink: {
-    color: "#2C3F00",
-    fontWeight: "500",
-  },
-  logoContainerSmall: {
-    marginBottom: 0,
+    fontWeight: "600",
   },
 })

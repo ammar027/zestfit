@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native"
+import { useTheme } from "../theme"
 
 export default function WaterTrackerScreen() {
   const [enabled, setEnabled] = useState(false)
@@ -11,6 +12,7 @@ export default function WaterTrackerScreen() {
   const [cupsConsumed, setCupsConsumed] = useState(0) // track water consumption
   const [isGoalModalVisible, setGoalModalVisible] = useState(false)
   const [tempGoal, setTempGoal] = useState(dailyWaterGoal.toString())
+  const { theme } = useTheme()
 
   // Define cup size in ml (standard cup = 250ml)
   const CUP_SIZE_ML = 250
@@ -232,37 +234,56 @@ export default function WaterTrackerScreen() {
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
+          backgroundColor: theme.colors.background,
         },
       ]}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#333" />
+      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Trackers</Text>
+      </View>
+
+      {/* Segment control for switching between trackers */}
+      <View style={[styles.segmentContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
+        <TouchableOpacity style={styles.segmentButton} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="scale" size={20} color={theme.colors.subtext} style={styles.segmentIcon} />
+          <Text style={[styles.segmentButtonText, { color: theme.colors.subtext }]}>Weight</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Water Tracker</Text>
+        <TouchableOpacity style={[styles.segmentButton, styles.segmentButtonActive, { backgroundColor: theme.colors.primary }]}>
+          <MaterialCommunityIcons name="water" size={20} color="#fff" style={styles.segmentIcon} />
+          <Text style={styles.segmentButtonTextActive}>Water</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.settingsCard}>
+        <View style={[styles.settingsCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
           <View style={[styles.switchContainer, !enabled && styles.noBottomMargin]}>
             <View style={styles.switchLabel}>
-              <MaterialCommunityIcons name="water-outline" size={24} color="#2C3F00" />
-              <Text style={styles.label}>Enable Water Tracker</Text>
+              <MaterialCommunityIcons name="water-outline" size={24} color={theme.colors.primary} />
+              <Text style={[styles.label, { color: theme.colors.text }]}>Enable Water Tracker</Text>
             </View>
-            <Switch value={enabled} onValueChange={toggleSwitch} trackColor={{ false: "#2C3F00", true: "#e2e6da" }} thumbColor={enabled ? "#2C3F00" : "#f4f3f4"} ios_backgroundColor="#E0E0E0" />
+            <Switch
+              value={enabled}
+              onValueChange={toggleSwitch}
+              trackColor={{
+                false: theme.dark ? "rgba(255,255,255,0.1)" : "#E0E0E0",
+                true: theme.colors.primary + "40",
+              }}
+              thumbColor={enabled ? theme.colors.primary : theme.dark ? "#636366" : "#f4f3f4"}
+              ios_backgroundColor={theme.dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}
+            />
           </View>
 
           {enabled && (
-            <TouchableOpacity style={styles.goalButton} onPress={() => setGoalModalVisible(true)}>
+            <TouchableOpacity style={[styles.goalButton, { borderTopColor: theme.colors.border }]} onPress={() => setGoalModalVisible(true)}>
               <View style={styles.goalButtonContent}>
-                <MaterialCommunityIcons name="target" size={24} color="#2C3F00" />
-                <Text style={styles.goalText}>Daily Water Goal</Text>
+                <MaterialCommunityIcons name="target" size={24} color={theme.colors.primary} />
+                <Text style={[styles.goalText, { color: theme.colors.text }]}>Daily Water Goal</Text>
               </View>
               <View style={styles.goalValueContainer}>
-                <Text style={styles.editGoalText}>{dailyWaterGoal} cups</Text>
-                <Text style={styles.goalLiterText}>({goalLiters} L)</Text>
+                <Text style={[styles.editGoalText, { color: theme.colors.primary }]}>{dailyWaterGoal} cups</Text>
+                <Text style={[styles.goalLiterText, { color: theme.colors.subtext }]}>({goalLiters} L)</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -270,17 +291,55 @@ export default function WaterTrackerScreen() {
       </ScrollView>
 
       <Modal transparent={true} visible={isGoalModalVisible} animationType="slide" onRequestClose={() => setGoalModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Set Daily Water Goal</Text>
-            <Text style={styles.modalSubtitle}>Recommended: 8 cups (2.0 L) per day</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={tempGoal} onChangeText={setTempGoal} placeholder="Enter cups" />
-            <Text style={styles.modalLiterText}>Equals {cupsToLiters(parseInt(tempGoal) || 0)} liters</Text>
+        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View
+            style={[
+              styles.modalContainer,
+              {
+                backgroundColor: theme.colors.card,
+                shadowColor: theme.colors.text,
+              },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set Daily Water Goal</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.colors.subtext }]}>Recommended: 8 cups (2.0 L) per day</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.input.background,
+                  color: theme.colors.input.text,
+                },
+              ]}
+              keyboardType="numeric"
+              value={tempGoal}
+              onChangeText={setTempGoal}
+              placeholder="Enter cups"
+              placeholderTextColor={theme.colors.input.placeholder}
+            />
+            <Text style={[styles.modalLiterText, { color: theme.colors.subtext }]}>Equals {cupsToLiters(parseInt(tempGoal) || 0)} liters</Text>
             <View style={styles.modalButtonContainer}>
-              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setGoalModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+              <TouchableOpacity
+                style={[
+                  styles.modalCancelButton,
+                  {
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+                onPress={() => setGoalModalVisible(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.colors.subtext }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveButton} onPress={saveWaterGoal}>
+              <TouchableOpacity
+                style={[
+                  styles.modalSaveButton,
+                  {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={saveWaterGoal}
+              >
                 <Text style={styles.modalSaveText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -299,6 +358,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     padding: 16,
     backgroundColor: "white",
     borderBottomWidth: 1,
@@ -307,8 +367,36 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    marginLeft: 16,
     color: "#333333",
+  },
+  segmentContainer: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 12,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  segmentButtonActive: {
+    backgroundColor: "#2C3F00",
+  },
+  segmentButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  segmentButtonTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  segmentIcon: {
+    marginRight: 8,
   },
   content: {
     flex: 1,
