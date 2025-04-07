@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTheme } from "../theme"
+import { DrawerActions } from "@react-navigation/native"
 
 export default function WeightTrackerScreen({ navigation }) {
   const [currentWeight, setCurrentWeight] = useState(null)
@@ -120,6 +121,18 @@ export default function WeightTrackerScreen({ navigation }) {
     ])
   }
 
+  const Header = () => {
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Weight Tracker</Text>
+        <View style={{ width: 28 }} />
+      </View>
+    )
+  }
+
   const insets = useSafeAreaInsets()
   const { width, height } = Dimensions.get("window")
 
@@ -137,22 +150,10 @@ export default function WeightTrackerScreen({ navigation }) {
       ]}
     >
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
-      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Trackers</Text>
+      <View style={[styles.header, {}]}>
+        <Header />
         <TouchableOpacity onPress={openWeightModal} style={styles.addButton}>
           <MaterialCommunityIcons name="plus" size={28} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Segment control for switching between trackers */}
-      <View style={[styles.segmentContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
-        <TouchableOpacity style={[styles.segmentButton, styles.segmentButtonActive, { backgroundColor: theme.colors.primary }]}>
-          <MaterialCommunityIcons name="scale" size={20} color="#fff" style={styles.segmentIcon} />
-          <Text style={styles.segmentButtonTextActive}>Weight</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.segmentButton} onPress={() => navigation.navigate("WaterTracker")}>
-          <MaterialCommunityIcons name="water" size={20} color={theme.colors.subtext} style={styles.segmentIcon} />
-          <Text style={[styles.segmentButtonText, { color: theme.colors.subtext }]}>Water</Text>
         </TouchableOpacity>
       </View>
 
@@ -280,15 +281,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "white",
-    elevation: 2,
-    zIndex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
-  content: { flex: 1, padding: 16 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    right: 15,
+  },
+  content: { flex: 1, padding: 16, marginBottom: -10 },
   segmentContainer: {
     flexDirection: "row",
     marginHorizontal: 16,
@@ -296,6 +299,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0",
     borderRadius: 10,
     overflow: "hidden",
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    right: 20,
   },
   segmentButton: {
     flex: 1,

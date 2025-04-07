@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, StatusBar, Switch, TouchableOpaci
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native"
+import { useNavigation, useRoute, useFocusEffect, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import { useTheme } from "../theme"
 
 export default function WaterTrackerScreen() {
@@ -17,7 +17,7 @@ export default function WaterTrackerScreen() {
   // Define cup size in ml (standard cup = 250ml)
   const CUP_SIZE_ML = 250
 
-  const navigation = useNavigation()
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const route = useRoute()
 
   // Load water tracker settings from AsyncStorage every time the screen comes into focus
@@ -225,122 +225,95 @@ export default function WaterTrackerScreen() {
   const goalLiters = cupsToLiters(dailyWaterGoal)
   const consumedLiters = cupsToLiters(cupsConsumed)
 
+  // Custom header component
+  const Header = () => {
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Water Tracker</Text>
+        <View style={{ width: 28 }} />
+      </View>
+    )
+  }
+
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          backgroundColor: theme.colors.background,
-        },
-      ]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
 
-      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Trackers</Text>
-      </View>
+      <Header />
 
-      {/* Segment control for switching between trackers */}
-      <View style={[styles.segmentContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
-        <TouchableOpacity style={styles.segmentButton} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="scale" size={20} color={theme.colors.subtext} style={styles.segmentIcon} />
-          <Text style={[styles.segmentButtonText, { color: theme.colors.subtext }]}>Weight</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.segmentButton, styles.segmentButtonActive, { backgroundColor: theme.colors.primary }]}>
-          <MaterialCommunityIcons name="water" size={20} color="#fff" style={styles.segmentIcon} />
-          <Text style={styles.segmentButtonTextActive}>Water</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.settingsCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
-          <View style={[styles.switchContainer, !enabled && styles.noBottomMargin]}>
-            <View style={styles.switchLabel}>
-              <MaterialCommunityIcons name="water-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.label, { color: theme.colors.text }]}>Enable Water Tracker</Text>
-            </View>
-            <Switch
-              value={enabled}
-              onValueChange={toggleSwitch}
-              trackColor={{
-                false: theme.dark ? "rgba(255,255,255,0.1)" : "#E0E0E0",
-                true: theme.colors.primary + "40",
-              }}
-              thumbColor={enabled ? theme.colors.primary : theme.dark ? "#636366" : "#f4f3f4"}
-              ios_backgroundColor={theme.dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}
-            />
+      <ScrollView style={styles.scrollContainer}>
+        {/* Enable/Disable Switch */}
+        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+          <View style={styles.switchContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Water Tracking</Text>
+            <Switch value={enabled} onValueChange={toggleSwitch} trackColor={{ false: "#767577", true: theme.colors.primary }} />
           </View>
-
-          {enabled && (
-            <TouchableOpacity style={[styles.goalButton, { borderTopColor: theme.colors.border }]} onPress={() => setGoalModalVisible(true)}>
-              <View style={styles.goalButtonContent}>
-                <MaterialCommunityIcons name="target" size={24} color={theme.colors.primary} />
-                <Text style={[styles.goalText, { color: theme.colors.text }]}>Daily Water Goal</Text>
-              </View>
-              <View style={styles.goalValueContainer}>
-                <Text style={[styles.editGoalText, { color: theme.colors.primary }]}>{dailyWaterGoal} cups</Text>
-                <Text style={[styles.goalLiterText, { color: theme.colors.subtext }]}>({goalLiters} L)</Text>
-              </View>
-            </TouchableOpacity>
-          )}
         </View>
+
+        {/* Daily Goal Section */}
+        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Daily Goal</Text>
+          <View style={styles.goalContainer}>
+            <Text style={[styles.goalText, { color: theme.colors.text }]}>
+              {dailyWaterGoal} cups ({goalLiters}L)
+            </Text>
+            <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.colors.primary }]} onPress={() => setGoalModalVisible(true)}>
+              <MaterialCommunityIcons name="pencil" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Progress Section */}
+        {/* <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Progress</Text>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: progressWidth, backgroundColor: theme.colors.primary }]} />
+            </View>
+            <Text style={[styles.progressText, { color: theme.colors.text }]}>
+              {cupsConsumed} of {dailyWaterGoal} cups ({consumedLiters}L)
+            </Text>
+          </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.primary }]} onPress={handleRemoveCup}>
+              <MaterialCommunityIcons name="minus" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.primary }]} onPress={handleAddCup}>
+              <MaterialCommunityIcons name="plus" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View> */}
       </ScrollView>
 
-      <Modal transparent={true} visible={isGoalModalVisible} animationType="slide" onRequestClose={() => setGoalModalVisible(false)}>
-        <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
-          <View
-            style={[
-              styles.modalContainer,
-              {
-                backgroundColor: theme.colors.card,
-                shadowColor: theme.colors.text,
-              },
-            ]}
-          >
+      {/* Goal Setting Modal */}
+      <Modal visible={isGoalModalVisible} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set Daily Water Goal</Text>
-            <Text style={[styles.modalSubtitle, { color: theme.colors.subtext }]}>Recommended: 8 cups (2.0 L) per day</Text>
             <TextInput
               style={[
-                styles.input,
+                styles.modalInput,
                 {
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.input.background,
                   color: theme.colors.input.text,
+                  backgroundColor: theme.colors.input.background,
+                  borderColor: theme.colors.border,
                 },
               ]}
               keyboardType="numeric"
               value={tempGoal}
               onChangeText={setTempGoal}
-              placeholder="Enter cups"
+              placeholder="Enter cups per day"
               placeholderTextColor={theme.colors.input.placeholder}
             />
-            <Text style={[styles.modalLiterText, { color: theme.colors.subtext }]}>Equals {cupsToLiters(parseInt(tempGoal) || 0)} liters</Text>
-            <View style={styles.modalButtonContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.modalCancelButton,
-                  {
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => setGoalModalVisible(false)}
-              >
-                <Text style={[styles.modalCancelText, { color: theme.colors.subtext }]}>Cancel</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: theme.colors.button.secondary }]} onPress={() => setGoalModalVisible(false)}>
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalSaveButton,
-                  {
-                    backgroundColor: theme.colors.primary,
-                  },
-                ]}
-                onPress={saveWaterGoal}
-              >
-                <Text style={styles.modalSaveText}>Save</Text>
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={saveWaterGoal}>
+                <Text style={[styles.saveButtonText, { color: theme.colors.secondaryButtonText }]}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -353,348 +326,135 @@ export default function WaterTrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#333333",
+    fontWeight: "700",
   },
-  segmentContainer: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginVertical: 12,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  segmentButton: {
-    flex: 1,
-    paddingVertical: 12,
-    flexDirection: "row",
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  segmentButtonActive: {
-    backgroundColor: "#2C3F00",
-  },
-  segmentButtonText: {
-    color: "#666",
-    fontWeight: "600",
-  },
-  segmentButtonTextActive: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  segmentIcon: {
-    marginRight: 8,
-  },
-  content: {
+  scrollContainer: {
     flex: 1,
     padding: 16,
   },
-  settingsCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
+  section: {
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
   },
   switchContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
   },
-  switchLabel: {
-    flexDirection: "row",
-    alignItems: "center",
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
   },
-  label: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: "#333333",
-  },
-  goalButton: {
+  goalContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#EFEFEF",
-  },
-  goalButtonContent: {
-    flexDirection: "row",
     alignItems: "center",
   },
   goalText: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: "#333333",
+    fontSize: 20,
+    fontWeight: "semibold",
   },
-  goalValueContainer: {
-    alignItems: "flex-end",
-  },
-  editGoalText: {
-    fontSize: 16,
-    color: "#2C3F00",
-    fontWeight: "500",
-  },
-  goalLiterText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
-  waterCardContainer: {
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  waterCounterCard: {
-    width: "100%",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  waterCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  waterCardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 8,
-    color: "#333333",
-  },
-  literInfoContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  literInfo: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  literValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2C3F00",
-  },
-  literLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 4,
-  },
-  literDivider: {
-    height: 40,
-    width: 1,
-    backgroundColor: "#EFEFEF",
+  editButton: {
+    padding: 5,
+    borderRadius: 8,
   },
   progressContainer: {
-    marginBottom: 20,
+    marginVertical: 16,
   },
-  progressBackground: {
-    height: 16,
+  progressBar: {
+    height: 12,
     backgroundColor: "#E0E0E0",
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: "hidden",
-    marginBottom: 4,
+    marginBottom: 8,
   },
   progressFill: {
-    height: 16,
-    backgroundColor: "#2C3F00",
-    borderRadius: 8,
+    height: "100%",
+    borderRadius: 6,
   },
   progressText: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "right",
-  },
-  counterContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  counterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F0F9FF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E1EFFD",
-  },
-  disabledButton: {
-    backgroundColor: "#F8F8F8",
-    borderColor: "#EFEFEF",
-  },
-  counterValue: {
-    alignItems: "center",
-  },
-  counterText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2C3F00",
-  },
-  counterLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 4,
-  },
-  cupIconsContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 16,
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  messageContainer: {
-    backgroundColor: "#F0F9FF",
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#2C3F00",
-  },
-  hydrationStatus: {
+    fontSize: 16,
     textAlign: "center",
-    fontSize: 16,
-    color: "#2C3F00",
-    fontWeight: "500",
   },
-  tipsCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tipsHeader: {
+  buttonContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+    justifyContent: "space-around",
+    marginTop: 16,
   },
-  tipsTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-    color: "#333333",
-  },
-  tipText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  modalOverlay: {
-    flex: 1,
+  button: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContainer: {
-    width: "85%",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 24,
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    padding: 20,
+    borderRadius: 12,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 8,
-    color: "#333333",
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: "center",
   },
-  input: {
-    width: "100%",
+  modalInput: {
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 16,
     fontSize: 16,
   },
-  modalLiterText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 24,
-  },
-  modalButtonContainer: {
+  modalButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
-  },
-  modalCancelButton: {
-    flex: 1,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  modalCancelText: {
-    color: "#666",
-    fontWeight: "600",
-  },
-  modalSaveButton: {
-    flex: 1,
-    padding: 12,
-    alignItems: "center",
-    backgroundColor: "#2C3F00",
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  modalSaveText: {
-    color: "white",
-    fontWeight: "600",
   },
   modalButton: {
     flex: 1,
-    padding: 10,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 8,
     alignItems: "center",
   },
   modalButtonText: {
-    color: "#2C3F00",
+    fontSize: 16,
     fontWeight: "600",
   },
-  noBottomMargin: {
-    marginBottom: 0,
+  saveButton: {},
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 })

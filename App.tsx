@@ -1,7 +1,7 @@
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native"
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
-import { StyleSheet, BackHandler, View, Animated, Platform, StatusBar, useColorScheme } from "react-native"
-import { SafeAreaProvider } from "react-native-safe-area-context"
+import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from "@react-navigation/drawer"
+import { StyleSheet, BackHandler, View, Animated, Platform, StatusBar, useColorScheme, Image } from "react-native"
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { Toaster } from "sonner-native"
 import HomeScreen from "./screens/HomeScreen"
 import GoalsEditorScreen from "./screens/GoalsEditorScreen"
@@ -11,7 +11,6 @@ import DashboardScreen from "./screens/DashboardScreen"
 import AuthScreen from "./screens/AuthScreen"
 import ProfileScreen from "./screens/ProfileScreen"
 import WelcomeScreen from "./screens/WelcomeScreen"
-import ChatScreen from "./screens/ChatScreen"
 import * as NavigationBar from "expo-navigation-bar"
 import { useEffect, useState, useRef, useMemo } from "react"
 import { supabase } from "./utils/supabaseClient"
@@ -22,11 +21,14 @@ import { CommonActions } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
 import { BlurView } from "expo-blur"
 import { ThemeProvider, useTheme } from "./theme"
-import { AppTheme } from "./theme/types"
 import { ToastProvider } from "./utils/toast"
-import PersonalDetailsScreen from "./screens/PersonalDetailsScreen"
+import PersonalInfoScreen from "./screens/PersonalInfoScreen"
+import FitnessInfoScreen from "./screens/FitnessInfoScreen"
+import { AppTheme } from "./theme/types"
+import { Text, Pressable } from "react-native"
 
-const Tab = createBottomTabNavigator()
+// Create a Drawer Navigator instead of Tab Navigator
+const Drawer = createDrawerNavigator()
 const Stack = createStackNavigator()
 
 // Create a context for managing authentication state
@@ -35,191 +37,188 @@ export const AuthContext = React.createContext({
   setIsLoggedIn: (value: boolean) => {},
 })
 
-// Tab Icon component for consistent styling
-function TabIcon({ name, color, focused, theme }: { name: any; color: string; focused: boolean; theme: AppTheme }) {
-  // Use an animated value based on the tab's focused state
-  const animatedScale = React.useRef(new Animated.Value(focused ? 1 : 0.9)).current
-  const animatedOpacity = React.useRef(new Animated.Value(focused ? 1 : 0.6)).current
-
-  // Run animation when focused state changes
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.spring(animatedScale, {
-        toValue: focused ? 1 : 0.9,
-        friction: 8,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(animatedOpacity, {
-        toValue: focused ? 1 : 0.6,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }, [focused, animatedScale, animatedOpacity])
+// Custom Drawer Content component with animations and modern styling
+function CustomDrawerContent(props: any) {
+  const { theme } = useTheme()
+  const { isLoggedIn } = React.useContext(AuthContext)
 
   return (
-    <Animated.View
-      style={{
-        height: 44,
-        width: 44,
-        borderRadius: 22,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: focused ? theme.colors.tabBar.highlight : "transparent",
-        transform: [{ scale: animatedScale }],
-        opacity: animatedOpacity,
-      }}
-    >
-      <MaterialCommunityIcons name={name} size={24} color={color} />
-    </Animated.View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <View style={[styles.drawerHeader, { borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.drawerLogoContainer, { backgroundColor: theme.colors.primary + "20" }]}>
+          <Image source={theme.dark ? require("./assets/icons/adaptive-icon-dark.png") : require("./assets/icons/adaptive-icon.png")} style={{ width: 140, height: 140 }} resizeMode="contain" />
+        </View>
+        {/* <Text style={[styles.drawerTitle, { color: theme.colors.text }]}>ZestFit</Text>*/}
+        <Text style={[styles.drawerSubtitle, { color: theme.colors.subtext }]}>Stay Healthy, Stay Fit</Text>
+      </View>
+
+      <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
+        <View style={{ marginTop: 16, paddingHorizontal: 10 }}>
+          {props.state.routes.map((route: any, index: number) => {
+            const { title, drawerIcon } = props.descriptors[route.key].options
+            const focused = index === props.state.index
+            const color = focused ? theme.colors.primary : theme.colors.text
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={() => props.navigation.navigate(route.name)}
+                style={({ pressed }) => [
+                  styles.drawerItem,
+                  {
+                    backgroundColor: focused ? theme.colors.primary + "20" : pressed ? theme.colors.card : "transparent",
+                  },
+                ]}
+              >
+                {drawerIcon && drawerIcon({ color, size: 24, focused })}
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    {
+                      color: focused ? theme.colors.primary : theme.colors.text,
+                      fontWeight: focused ? "600" : "400",
+                    },
+                  ]}
+                >
+                  {title}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      </DrawerContentScrollView>
+
+      <View style={styles.drawerFooter}>
+        <Text style={[styles.drawerFooterText, { color: theme.colors.subtext }]}>v1.0.0 • ZestFit 2025</Text>
+      </View>
+    </SafeAreaView>
   )
 }
 
-// Main tab navigation
-function TabNavigator() {
+// Custom Drawer Item with animation
+function AnimatedDrawerItem({ label, iconName, focused, onPress, theme }: any) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.drawerItem,
+        {
+          backgroundColor: focused ? theme.colors.primary + "20" : pressed ? theme.colors.card : "transparent",
+        },
+      ]}
+    >
+      <MaterialCommunityIcons name={iconName} size={24} color={focused ? theme.colors.primary : theme.colors.text} />
+      <Text
+        style={[
+          styles.drawerItemText,
+          {
+            color: focused ? theme.colors.primary : theme.colors.text,
+            fontWeight: focused ? "600" : "400",
+          },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  )
+}
+
+// Main drawer navigation
+function DrawerNavigator() {
   const { isLoggedIn } = React.useContext(AuthContext)
   const { theme } = useTheme()
 
   return (
-    <Tab.Navigator
+    <Drawer.Navigator
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.tabBar.active,
-        tabBarInactiveTintColor: theme.colors.tabBar.inactive,
-        tabBarShowLabel: false,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-          marginBottom: 4,
+        drawerType: "slide",
+        drawerStyle: {
+          width: "75%",
+          backgroundColor: theme.colors.background,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+          borderBottomRightRadius: 0,
         },
-        tabBarStyle: {
-          position: "absolute",
-          height: 65,
-          borderTopWidth: 0,
-          elevation: 0,
-          paddingBottom: Platform.OS === "ios" ? 25 : 0,
-          paddingHorizontal: 10,
-          bottom: 5,
-          left: 15,
-          right: 15,
-          borderRadius: 22.5,
-          overflow: "hidden",
-          marginHorizontal: 20,
+        drawerActiveTintColor: theme.colors.primary,
+        drawerInactiveTintColor: theme.colors.text,
+        swipeEdgeWidth: 50,
+        drawerLabelStyle: {
+          marginLeft: -20,
         },
-        tabBarItemStyle: {
-          padding: 13.5,
-          height: 30,
-        },
-        tabBarBackground: () => {
-          return (
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: theme.colors.tabBar.background,
-                borderRadius: 22.5,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                overflow: "hidden",
-                shadowColor: theme.colors.text,
-                shadowOffset: { width: 0, height: 5 },
-                shadowOpacity: 0.15,
-                shadowRadius: 10,
-                elevation: 10,
-              }}
-            >
-              {Platform.OS === "ios" && (
-                <BlurView
-                  tint={theme.dark ? "dark" : "light"}
-                  intensity={90}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                  }}
-                />
-              )}
-            </View>
-          )
-        },
+        overlayColor: theme.dark ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.3)",
       }}
     >
-      <Tab.Screen
+      <Drawer.Screen
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => <TabIcon name="home" color={color} focused={focused} theme={theme} />,
+          title: "Home",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name="home" size={24} color={color} />,
         }}
       />
-      <Tab.Screen
+      <Drawer.Screen
+        name="Goals"
+        component={GoalsEditorScreen}
+        options={{
+          title: "Goals",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name="clipboard-list" size={24} color={color} />,
+        }}
+      />
+      <Drawer.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => <TabIcon name="view-dashboard" color={color} focused={focused} theme={theme} />,
+          title: "Dashboard",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name="view-dashboard" size={24} color={color} />,
         }}
       />
-      <Tab.Screen
-        name="Chat"
-        component={ChatScreen}
+      <Drawer.Screen
+        name="Water"
+        component={WaterTrackerScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => <TabIcon name="chat-processing" color={color} focused={focused} theme={theme} />,
+          title: "Water Tracker",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name="water" size={24} color={color} />,
         }}
       />
-      <Tab.Screen
+      <Drawer.Screen
+        name="Weight"
+        component={WeightTrackerScreen}
+        options={{
+          title: "Weight Tracker",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name="scale-bathroom" size={24} color={color} />,
+        }}
+      />
+      <Drawer.Screen
         name="Profile"
         component={isLoggedIn ? ProfileScreen : AuthScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => <TabIcon name={isLoggedIn ? "account" : "login"} color={color} focused={focused} theme={theme} />,
-          tabBarLabel: isLoggedIn ? "Profile" : "Sign In",
+          title: isLoggedIn ? "Profile" : "Sign In",
+          drawerIcon: ({ focused, color }) => <MaterialCommunityIcons name={isLoggedIn ? "account" : "login"} size={24} color={color} />,
         }}
       />
-    </Tab.Navigator>
+    </Drawer.Navigator>
   )
 }
 
-// Create screen stacks
-function WeightTrackerStack() {
+// Create screen stacks for modals and full-screen flows
+function RootStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="TrackerHome" component={WeightTrackerScreen} />
-    </Stack.Navigator>
-  )
-}
-
-function WaterTrackerStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="WaterTrackerHome" component={WaterTrackerScreen} />
-    </Stack.Navigator>
-  )
-}
-
-// Create Auth stack to handle authentication flow
-function AuthStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="AuthScreen" component={AuthScreen} />
+      <Stack.Screen name="DrawerMain" component={DrawerNavigator} />
+      <Stack.Screen name="Auth" component={AuthScreen} options={{ presentation: "modal" }} />
+      <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+      <Stack.Screen name="FitnessInfo" component={FitnessInfoScreen} />
     </Stack.Navigator>
   )
 }
 
 // Main navigation structure
 function MainNavigator() {
-  const { isLoggedIn } = React.useContext(AuthContext)
-
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Tabs" component={TabNavigator} />
-      <Stack.Screen name="Auth" component={AuthStack} />
-      <Stack.Screen name="Trackers" component={WeightTrackerStack} />
-      <Stack.Screen name="WaterTracker" component={WaterTrackerStack} />
-      <Stack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
+      <Stack.Screen name="Root" component={RootStack} />
     </Stack.Navigator>
   )
 }
@@ -290,7 +289,7 @@ function AppContent() {
           navigationRef.current.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: "Main" }],
+              routes: [{ name: "Root" }],
             }),
           )
           return true // Prevent default back behavior
@@ -320,7 +319,7 @@ function AppContent() {
         navigationRef.current.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: "Main" }],
+            routes: [{ name: "Root" }],
           }),
         )
         firstTimeRef.current = false
@@ -375,13 +374,13 @@ function AppContent() {
                 const currentRoute = routes[state.index]
 
                 // If we just navigated to Main and we should have seen welcome
-                if (currentRoute.name === "Main" && firstTimeRef.current && hasSeenWelcome === false) {
+                if (currentRoute.name === "Root" && firstTimeRef.current && hasSeenWelcome === false) {
                   // Completely reset navigation stack to fix any history issues
                   setTimeout(() => {
                     navigationRef.current.dispatch(
                       CommonActions.reset({
                         index: 0,
-                        routes: [{ name: "Main" }],
+                        routes: [{ name: "Root" }],
                       }),
                     )
 
@@ -394,7 +393,7 @@ function AppContent() {
               }
             }}
           >
-            <Stack.Navigator screenOptions={{ headerShown: false }}>{hasSeenWelcome === false ? <Stack.Screen name="Welcome" component={WelcomeScreen} /> : <Stack.Screen name="Main" component={MainNavigator} />}</Stack.Navigator>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>{hasSeenWelcome === false ? <Stack.Screen name="Welcome" component={WelcomeScreen} /> : <Stack.Screen name="Root" component={MainNavigator} />}</Stack.Navigator>
           </NavigationContainer>
         </ToastProvider>
       </SafeAreaProvider>
@@ -411,9 +410,54 @@ export default function App() {
   )
 }
 
-// Simplified styles
+// Updated styles with drawer-specific styling
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  drawerHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    alignItems: "center",
+    borderBottomWidth: 1,
+    marginBottom: 5,
+  },
+  drawerLogoContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  drawerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  drawerSubtitle: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  drawerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    paddingLeft: 16,
+    marginVertical: 2,
+    borderRadius: 8,
+  },
+  drawerItemText: {
+    fontSize: 15,
+    marginLeft: 16,
+  },
+  drawerFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
+    alignItems: "center",
+  },
+  drawerFooterText: {
+    fontSize: 12,
   },
 })

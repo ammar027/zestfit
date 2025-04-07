@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, RefreshControl } from "react-native"
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, RefreshControl, StatusBar } from "react-native"
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons"
 import { LineChart, BarChart, PieChart } from "react-native-chart-kit"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -12,6 +12,7 @@ import { queryCache } from "../utils/supabaseClient"
 import MacroCards from "../components/MacroCards"
 import { getLocalDailyNutrition, saveLocalDailyNutrition, getLocalUserGoals, saveLocalUserGoals, getLocalWaterSettings, saveLocalWaterSettings } from "../utils/localStorage"
 import { useTheme } from "../theme"
+import { useNavigation, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 
 const { width } = Dimensions.get("window")
 
@@ -47,8 +48,9 @@ interface DailyStats {
   macros: { carbs: number; protein: number; fat: number }
 }
 
-export default function DashboardScreen({ navigation }: NavigationProps) {
+export default function DashboardScreen() {
   const { theme } = useTheme()
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const [timeframe, setTimeframe] = useState<"weekly" | "monthly">("weekly")
   const [nutritionData, setNutritionData] = useState<NutritionDataPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -633,46 +635,55 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
     }
   }, [selectedDataPoint, batchResults])
 
+  // Custom header component
+  const Header = () => {
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Dashboard</Text>
+        <View style={{ width: 28 }} />
+      </View>
+    )
+  }
+
   if (isLoading) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          {
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
-            paddingLeft: insets.left,
-            paddingRight: insets.right,
-            backgroundColor: theme.colors.background,
-          },
-        ]}
-      >
-        <View style={[styles.header, { backgroundColor: theme.colors.card }]}>
-          <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-            <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Dashboard</Text>
-            {user && <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>Your health insights at a glance</Text>}
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
+
+        <Header />
+
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
-          <TouchableOpacity disabled style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={24} color={theme.colors.subtext} />
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
+
+      <Header />
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.timeframeSelector}>
+          <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "weekly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("weekly")}>
+            <Text style={[styles.timeframeButtonText, { color: timeframe === "weekly" ? "#ffffff" : theme.colors.subtext }]}>Weekly</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "monthly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("monthly")}>
+            <Text style={[styles.timeframeButtonText, { color: timeframe === "monthly" ? "#ffffff" : theme.colors.subtext }]}>Monthly</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.timeframeSelector, { backgroundColor: theme.colors.background }]}>
-          <TouchableOpacity disabled style={[styles.timeframeButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
-            <Text style={[styles.timeframeButtonText, { color: theme.colors.subtext }]}>Weekly</Text>
-          </TouchableOpacity>
-          <TouchableOpacity disabled style={[styles.timeframeButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]}>
-            <Text style={[styles.timeframeButtonText, { color: theme.colors.subtext }]}>Monthly</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.chartContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.chartContainer}>
           <View style={styles.performanceIndicator}>
-            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.performanceText, { color: theme.colors.subtext }]}>Loading dashboard data...</Text>
+            <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.subtext} />
+            <Text style={[styles.performanceText, { color: theme.colors.subtext }]}>Last refreshed: {lastRefreshText}</Text>
           </View>
 
           <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
@@ -690,231 +701,7 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
           <View style={styles.macroCardsContainer}>
             <RenderSkeletonMacroCards />
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    )
-  }
-
-  return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          backgroundColor: theme.colors.background,
-        },
-      ]}
-    >
-      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Dashboard</Text>
-          {user && <Text style={[styles.headerSubtitle, { color: theme.colors.subtext }]}>Your health insights at a glance</Text>}
         </View>
-        <View style={styles.headerActionsContainer}>
-          <Text style={[styles.lastRefreshText, { color: theme.colors.subtext }]}>{lastRefreshText}</Text>
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton} disabled={isRefreshing}>
-            {isRefreshing ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <MaterialCommunityIcons name="refresh" size={24} color={theme.colors.text} />}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.timeframeSelector}>
-        <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "weekly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("weekly")}>
-          <Text style={[styles.timeframeButtonText, { color: timeframe === "weekly" ? "#ffffff" : theme.colors.subtext }]}>Weekly</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.timeframeButton, { backgroundColor: timeframe === "monthly" ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "#f0f0f0" }]} onPress={() => setTimeframe("monthly")}>
-          <Text style={[styles.timeframeButtonText, { color: timeframe === "monthly" ? "#ffffff" : theme.colors.subtext }]}>Monthly</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.chartContainer} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}>
-        <View style={styles.performanceIndicator}>
-          <MaterialCommunityIcons name="clock-outline" size={16} color={theme.colors.subtext} />
-          <Text style={[styles.performanceText, { color: theme.colors.subtext }]}>Last refreshed: {lastRefreshText}</Text>
-        </View>
-
-        <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Calories</Text>
-          {getChartData("calories") && (
-            <LineChart
-              data={getChartData("calories") || { labels: [], datasets: [{ data: [0], color: () => "rgba(0,0,0,0)" }] }}
-              width={width - 40}
-              height={200}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              withInnerLines={false}
-              withOuterLines={true}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              fromZero={true}
-              onDataPointClick={({ index }: { index: number }) => handleSelectDay(index)}
-              renderDotContent={({ x, y, index }: { x: number; y: number; index: number }) => {
-                const dataPoint = nutritionData[index]
-                const isSelected = selectedDataPoint && selectedDataPoint.date === dataPoint.date
-
-                return isSelected ? (
-                  <MotiView
-                    key={`tooltip-${dataPoint.date}`}
-                    from={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    style={{
-                      position: "absolute",
-                      top: y - 30,
-                      left: x - 30,
-                      backgroundColor: theme.colors.card,
-                      padding: 4,
-                      borderRadius: 8,
-                      elevation: 3,
-                      shadowColor: theme.colors.text,
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 2,
-                      width: 60,
-                    }}
-                  >
-                    <Text style={[styles.dataPointLabel, { color: theme.colors.text }]}>{dataPoint.calories} cal</Text>
-                  </MotiView>
-                ) : null
-              }}
-              decorator={() => {
-                if (!selectedDataPoint) return null
-
-                // Find the index of the selected data point
-                const index = nutritionData.findIndex((item) => item.date === selectedDataPoint.date)
-
-                if (index === -1) return null
-
-                return (
-                  <MotiView
-                    key={`highlight-${selectedDataPoint.date}`}
-                    from={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ type: "timing", duration: 300 }}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      bottom: 0,
-                      left: index * ((width - 60) / nutritionData.length) + 35,
-                      width: 2,
-                      backgroundColor: theme.colors.primary,
-                    }}
-                  />
-                )
-              }}
-            />
-          )}
-        </View>
-
-        <View style={[styles.chartCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Macronutrients</Text>
-          {nutritionData.length > 0 && (
-            <BarChart
-              data={{
-                labels: nutritionData.map((item) => format(new Date(item.date), timeframe === "weekly" ? "EEE" : "d")),
-                datasets: [
-                  {
-                    data: nutritionData.map((item) => item.carbs || 0),
-                  },
-                  {
-                    data: nutritionData.map((item) => item.protein || 0),
-                  },
-                  {
-                    data: nutritionData.map((item) => item.fat || 0),
-                  },
-                ],
-              }}
-              width={width - 40}
-              height={200}
-              chartConfig={{
-                ...chartConfig,
-                stackedBar: false,
-                barPercentage: 0.6,
-                decimalPlaces: 0,
-                propsForBackgroundLines: {
-                  strokeDasharray: "",
-                },
-                color: (opacity = 1, index = 0) => {
-                  const colors = [
-                    `rgba(255, 107, 107, ${opacity})`, // carbs
-                    `rgba(78, 205, 196, ${opacity})`, // protein
-                    `rgba(255, 167, 38, ${opacity})`, // fat
-                  ]
-                  return colors[index % colors.length]
-                },
-              }}
-              style={styles.chart}
-              withInnerLines={false}
-              showBarTops={false}
-              fromZero={true}
-              yAxisLabel=""
-              yAxisSuffix="g"
-            />
-          )}
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem} key="legend-carbs">
-              <View style={[styles.legendColor, { backgroundColor: "rgba(255, 107, 107, 1)" }]} />
-              <Text style={styles.legendText}>Carbs</Text>
-            </View>
-            <View style={styles.legendItem} key="legend-protein">
-              <View style={[styles.legendColor, { backgroundColor: "rgba(78, 205, 196, 1)" }]} />
-              <Text style={styles.legendText}>Protein</Text>
-            </View>
-            <View style={styles.legendItem} key="legend-fat">
-              <View style={[styles.legendColor, { backgroundColor: "rgba(255, 167, 38, 1)" }]} />
-              <Text style={styles.legendText}>Fat</Text>
-            </View>
-          </View>
-        </View>
-
-        {selectedDataPoint && (
-          <View style={[styles.selectedDayCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
-            <Text style={[styles.selectedDayTitle, { color: theme.colors.text }]}>{format(new Date(selectedDataPoint.date), "MMMM d, yyyy")}</Text>
-
-            {renderCalorieProgress()}
-
-            <View style={styles.macroDistributionContainer}>
-              {getMacroDistribution().length > 0 ? (
-                <PieChart data={getMacroDistribution()} width={width - 40} height={180} chartConfig={chartConfig} accessor="population" backgroundColor="transparent" paddingLeft="15" absolute={false} hasLegend={false} />
-              ) : (
-                <View style={styles.noDataContainer}>
-                  <Ionicons name="nutrition-outline" size={40} color={theme.colors.subtext} />
-                  <Text style={[styles.noDataText, { color: theme.colors.subtext }]}>No nutrition data recorded</Text>
-                </View>
-              )}
-
-              <View style={[styles.macroDetailsContainer, { backgroundColor: theme.dark ? "rgba(255,255,255,0.07)" : "#f9f9f9" }]}>
-                <View style={styles.macroDetailItem}>
-                  <View style={[styles.macroDetailColor, { backgroundColor: "rgba(255, 107, 107, 1)" }]} />
-                  <View>
-                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Carbs</Text>
-                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.carbs}g</Text>
-                  </View>
-                </View>
-                <View style={styles.macroDetailItem}>
-                  <View style={[styles.macroDetailColor, { backgroundColor: "rgba(78, 205, 196, 1)" }]} />
-                  <View>
-                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Protein</Text>
-                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.protein}g</Text>
-                  </View>
-                </View>
-                <View style={styles.macroDetailItem}>
-                  <View style={[styles.macroDetailColor, { backgroundColor: "rgba(255, 167, 38, 1)" }]} />
-                  <View>
-                    <Text style={[styles.macroDetailLabel, { color: theme.colors.subtext }]}>Fat</Text>
-                    <Text style={[styles.macroDetailValue, { color: theme.colors.text }]}>{selectedDataPoint.fat}g</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
 
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
@@ -958,44 +745,30 @@ export default function DashboardScreen({ navigation }: NavigationProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "white",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  headerTitleContainer: {
-    flex: 1,
-    marginLeft: 16,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "700",
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
-  headerActionsContainer: {
-    flexDirection: "row",
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
     alignItems: "center",
   },
-  lastRefreshText: {
-    fontSize: 12,
-    color: "#888",
-    marginRight: 8,
+  scrollView: {
+    flex: 1,
   },
-  refreshButton: {
-    padding: 8,
+  contentContainer: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -1014,15 +787,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#EEEEEE",
   },
-  timeframeButtonActive: {
-    backgroundColor: "#2C3F00",
-  },
   timeframeButtonText: {
     fontSize: 16,
     color: "#666666",
-  },
-  timeframeButtonTextActive: {
-    color: "white",
   },
   chartContainer: {
     flex: 1,
@@ -1039,99 +806,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  selectedDayCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  selectedDayTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 16,
-    color: "#333",
-    textAlign: "center",
-  },
-  macroDistributionContainer: {
-    alignItems: "center",
-  },
-  macroDetailsContainer: {
-    width: "100%",
-    marginTop: 10,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 12,
-    padding: 10,
-  },
-  macroDetailItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 5,
-  },
-  macroDetailColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 10,
-  },
-  macroDetailLabel: {
-    fontSize: 14,
-    color: "#666",
-  },
-  macroDetailValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  noDataContainer: {
-    height: 150,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noDataText: {
-    fontSize: 16,
-    color: "#888",
-    marginTop: 10,
-  },
   chartTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
     color: "#333",
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-    alignSelf: "center",
-  },
-  dataPointLabel: {
-    fontSize: 12,
-    textAlign: "center",
-    color: "#333",
-  },
-  legendContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 16,
-    gap: 16,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  legendText: {
-    fontSize: 12,
-    color: "#666",
   },
   statsContainer: {
     flexDirection: "row",
@@ -1171,6 +850,18 @@ const styles = StyleSheet.create({
     color: "#888",
     marginLeft: 8,
   },
+  macroCardsContainer: {
+    marginTop: 16,
+    marginBottom: 30,
+    marginHorizontal: -16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginHorizontal: 20,
+    marginBottom: 10,
+  },
   progressContainer: {
     marginBottom: 20,
   },
@@ -1189,17 +880,5 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 5,
     textAlign: "right",
-  },
-  macroCardsContainer: {
-    marginTop: 16,
-    marginBottom: 30,
-    marginHorizontal: -16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginHorizontal: 20,
-    marginBottom: 10,
   },
 })

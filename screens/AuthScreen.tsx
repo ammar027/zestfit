@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useContext } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions, Animated } from "react-native"
-import { useNavigation } from "@react-navigation/native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions, Animated, StatusBar } from "react-native"
+import { useNavigation, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import { supabase } from "../utils/supabaseClient"
 import { RootStackParamList } from "../types/navigation"
 import { DrawerNavigationProp } from "@react-navigation/drawer"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { AuthContext } from "../App"
 import { useTheme } from "../theme"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 type AuthScreenNavigationProp = DrawerNavigationProp<RootStackParamList, "Auth">
 
@@ -20,10 +21,11 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const navigation = useNavigation<AuthScreenNavigationProp>()
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const { setIsLoggedIn } = useContext(AuthContext)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const { height: screenHeight } = Dimensions.get("window")
+  const insets = useSafeAreaInsets()
 
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current
@@ -209,10 +211,25 @@ export default function AuthScreen() {
     ])
   }
 
+  // Custom header component
+  const Header = () => {
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Sign In</Text>
+        <View style={{ width: 28 }} />
+      </View>
+    )
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 20}>
         <ScrollView contentContainerStyle={[styles.scrollContainer, keyboardVisible && { paddingBottom: 120 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Header />
           <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerSmall]}>
             <Image
               source={require("../assets/icons/adaptive-icon.png")}
@@ -483,5 +500,18 @@ const styles = StyleSheet.create({
   },
   termsLink: {
     fontWeight: "600",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+  },
+  menuButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "bold",
   },
 })

@@ -6,7 +6,6 @@ export type ColorScheme = "light" | "dark"
 // Define the light theme colors
 const lightColors: ThemeColors = {
   primary: "#34C759", // Nike Green
-  accent: "#30D158", // Nike Green Dark
   background: "#FFFFFF", // White
   card: "#F2F2F7", // Light Gray
   text: "#1C1C1E", // Rich Black
@@ -35,7 +34,7 @@ const lightColors: ThemeColors = {
     danger: "#FF3B30",
   },
   tabBar: {
-    background: "rgb(242, 242, 247)", // Semi-transparent card color
+    background: "rgba(242, 242, 247, 0.9)", // Semi-transparent card color
     active: "#34C759", // Primary color
     inactive: "#8E8E93", // Gray
     highlight: "rgba(52, 199, 89, 0.1)", // Light green background for selected tab
@@ -46,8 +45,8 @@ const lightColors: ThemeColors = {
 // Define the dark theme colors
 const darkColors: ThemeColors = {
   primary: "#30D158", // Nike Green Dark
-  background: "#000000", // Deep Black
-  card: "#1C1C1E", // Dark Gray
+  background: "#0c0c12", // Deep Blue
+  card: "#14141e", // Dark Gray
   text: "#FFFFFF", // White
   subtext: "#A1A1A6", // Cool Gray
   border: "#38383A", // Dark Border
@@ -74,7 +73,7 @@ const darkColors: ThemeColors = {
     danger: "#FF453A",
   },
   tabBar: {
-    background: "rgb(28, 28, 30)", // Semi-transparent dark card color
+    background: "rgba(28, 28, 30, 0.9)", // Semi-transparent dark card color
     active: "#30D158", // Primary color in dark
     inactive: "#8E8E93", // Gray
     highlight: "rgba(48, 209, 88, 0.15)", // Dark green background for selected tab

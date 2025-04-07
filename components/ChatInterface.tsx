@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, Keyboard, Dimensions } from "react-native"
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, Keyboard, Dimensions, Animated, SafeAreaView, StatusBar } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import { getChatMessages, saveChatMessages, uploadImage, deleteMessage, saveDailyNutrition } from "../utils/supabaseutils"
 import { saveLocalChatMessages, getLocalChatMessages, deleteLocalChatMessage } from "../utils/localStorage"
 import { queryCache } from "../utils/supabaseClient"
 import { useTheme } from "../theme"
+import { LinearGradient } from "expo-linear-gradient"
 
 // Define types for the component props and state
 interface ChatInterfaceProps {
@@ -46,6 +47,11 @@ interface Message {
   timestamp?: Date | string
 }
 
+interface ChatInterfaceState {
+  isExpanded: boolean
+  expandAnimation: Animated.Value
+}
+
 // Type declaration for the StyleSheet to include the new style properties
 type ExtendedStyles = typeof styles & {
   actionButtons: any
@@ -63,6 +69,7 @@ type ExtendedStyles = typeof styles & {
 }
 
 export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfaceProps) {
+  const { theme } = useTheme()
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -77,7 +84,11 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [initialLayout, setInitialLayout] = useState(false)
-  const { theme } = useTheme()
+  const [isExpanded, setIsExpanded] = useState(false)
+  const expandAnim = useRef(new Animated.Value(0)).current
+  const chatHeight = useRef(Dimensions.get("window").height * 0.6).current
+  const modalSlideAnim = useRef(new Animated.Value(Dimensions.get("window").height)).current
+  const [modalVisible, setModalVisible] = useState(false)
 
   // Cache the date in a ref to detect changes
   const dateRef = useRef(date)
@@ -1116,561 +1127,409 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
     [editingMessage, handleShowMenu, activeMessageId, theme],
   )
 
+  // Toggle expansion of chat interface
+  const toggleExpansion = () => {
+    // Open the full-screen modal instead of expanding in place
+    openChatModal()
+  }
+
+  // Open the chat modal
+  const openChatModal = () => {
+    setModalVisible(true)
+    Animated.spring(modalSlideAnim, {
+      toValue: 0,
+      friction: 10,
+      tension: 60,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  // Close the chat modal
+  const closeChatModal = () => {
+    // Use timing animation instead of spring for more reliable closing
+    Animated.timing(modalSlideAnim, {
+      toValue: Dimensions.get("window").height,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setModalVisible(false)
+      } else {
+        // Force close if animation didn't finish properly
+        setModalVisible(false)
+      }
+    })
+  }
+
+  const handleOverlayPress = () => {
+    closeChatModal()
+  }
+
+  // Calculate animated height for the collapsed view
+  const animatedHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [60, 60], // Keep the same height since we're using a modal
+  })
+
   return (
-    <KeyboardAvoidingView style={[styles.container, { backgroundColor: theme.colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} contentContainerStyle={{ flex: 1 }}>
-      <ScrollView ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} style={styles.messagesContainer} contentContainerStyle={[messages.length === 0 ? styles.centerContent : null, { paddingBottom: keyboardVisible ? (keyboardHeight > 0 ? keyboardHeight + 60 : 160) : 40 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" onLayout={() => setInitialLayout(true)}>
-        {messages.length === 0 ? EmptyState : messages.map(renderMessage)}
-      </ScrollView>
-
-      {/* Modal for context menu */}
-      <Modal transparent={true} statusBarTranslucent={true} visible={menuPosition !== null} animationType="fade" onRequestClose={() => setMenuPosition(null)}>
-        <TouchableWithoutFeedback onPress={() => setMenuPosition(null)}>
-          <View style={styles.modalOverlay}>
-            {menuPosition && (
-              <View
-                style={[
-                  (styles as ExtendedStyles).messageMenu,
-                  {
-                    position: "absolute",
-                    top: menuPosition.top,
-                    right: menuPosition.right,
-                    backgroundColor: theme.colors.card,
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  style={(styles as ExtendedStyles).menuItem}
-                  onPress={() => {
-                    if (menuPosition) handleEditMessage(menuPosition.messageId)
-                    setMenuPosition(null)
-                  }}
-                >
-                  <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.text} />
-                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: theme.colors.text }]}>Edit</Text>
-                </TouchableOpacity>
-                <View style={[(styles as ExtendedStyles).menuDivider, { backgroundColor: theme.colors.border }]} />
-                <TouchableOpacity
-                  style={(styles as ExtendedStyles).menuItem}
-                  onPress={() => {
-                    if (menuPosition) handleDeleteMessage(menuPosition.messageId)
-                    setMenuPosition(null)
-                  }}
-                >
-                  <MaterialCommunityIcons name="delete" size={16} color={theme.colors.error} />
-                  <Text style={[(styles as ExtendedStyles).menuItemText, { color: theme.colors.error }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Image Preview Modal - Enhanced with zoom capabilities */}
-      <Modal animationType="fade" transparent={true} visible={showPreview} onRequestClose={() => setShowPreview(false)}>
-        <View style={styles.previewModalContainer}>
-          <View style={[styles.previewModal, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{editingMessage ? "Update Image" : "Food Image Preview"}</Text>
-            {imagePreview && (
-              <View style={styles.previewImageContainer}>
-                <Image source={{ uri: imagePreview }} style={styles.previewImage} resizeMode="contain" />
-                <Text style={[styles.previewCaption, { color: theme.colors.subtext }]}>Tap the image to analyze its nutritional content</Text>
-              </View>
-            )}
-            <View style={styles.previewButtons}>
-              <TouchableOpacity style={[styles.previewButton, styles.continueButton, { backgroundColor: theme.colors.primary }]} onPress={() => setShowPreview(false)}>
-                <Text style={styles.previewButtonText}>{editingMessage ? "Continue Editing" : "Use This Image"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.previewButton, styles.cancelButton, { backgroundColor: theme.colors.error }]} onPress={clearSelectedImage}>
-                <Text style={styles.previewButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Selected Image Thumbnail */}
-      {selectedImage && !showPreview && (
-        <View style={styles.selectedImageContainer}>
-          <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
-          <TouchableOpacity style={[styles.clearImageButton, { backgroundColor: theme.colors.primary }]} onPress={clearSelectedImage}>
-            <MaterialCommunityIcons name="close" size={18} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Input Area */}
-      <View
+    <>
+      <Animated.View
         style={[
-          styles.inputContainer,
-          keyboardVisible && styles.inputContainerWithKeyboard,
+          styles.container,
           {
-            backgroundColor: theme.colors.card,
+            height: animatedHeight,
+            borderRadius: 22,
             borderColor: theme.colors.border,
+            borderWidth: 1,
           },
         ]}
       >
-        <View
+        <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.gradientOverlay}>
+          {/* Header - Now just a trigger for the modal */}
+          <TouchableOpacity style={styles.header} onPress={toggleExpansion} activeOpacity={0.7}>
+            <View style={styles.headerContent}>
+              <MaterialCommunityIcons name="chat-processing-outline" size={22} color={theme.colors.primary} />
+              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Assistant</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-up" size={24} color={theme.colors.subtext} />
+          </TouchableOpacity>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Full-screen Modal Chat Interface */}
+      <Modal visible={modalVisible} transparent={true} animationType="none" onRequestClose={closeChatModal} statusBarTranslucent={true}>
+        <TouchableWithoutFeedback onPress={handleOverlayPress}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+
+        <Animated.View
           style={[
-            styles.inputWrapper,
+            styles.modalContainer,
             {
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.input.background,
+              backgroundColor: theme.colors.background,
+              transform: [{ translateY: modalSlideAnim }],
             },
           ]}
         >
-          <TextInput
-            style={[styles.input, { color: theme.colors.input.text }]}
-            value={message}
-            onChangeText={setMessage}
-            placeholder={editingMessage ? "Edit your message..." : selectedImage ? "Add a description (optional)" : "What did you eat or exercise?"}
-            placeholderTextColor={theme.colors.input.placeholder}
-            multiline={true}
-            blurOnSubmit={false}
-            onFocus={() => {
-              // Ensure we scroll to bottom with enough delay for the keyboard to appear
-              setTimeout(() => {
-                scrollViewRef.current?.scrollToEnd({ animated: true })
-              }, 300)
-            }}
-          />
-          <View style={styles.imageButtons}>
-            <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-              <MaterialCommunityIcons name="image" size={22} color={theme.colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
-              <MaterialCommunityIcons name="camera" size={22} color={theme.colors.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.colors.primary }, !message.trim() && !selectedImage && [styles.sendButtonDisabled, { backgroundColor: theme.colors.primary + "50" }], uploading && [styles.sendButtonUploading, { backgroundColor: theme.colors.primary + "70" }], editingMessage && [styles.editButton, { backgroundColor: theme.colors.success }]]} onPress={handleSend} disabled={(!message.trim() && !selectedImage) || uploading}>
-          {uploading ? <ActivityIndicator size="small" color="white" /> : <MaterialCommunityIcons name={editingMessage ? "check" : "send"} size={22} color="white" />}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.modalGradient}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Modal Header */}
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                <TouchableOpacity style={styles.closeButton} onPress={closeChatModal}>
+                  <MaterialCommunityIcons name="chevron-down" size={26} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Nutrition Assistant</Text>
+                <View style={styles.headerSpacer} />
+              </View>
+
+              {/* Messages Content */}
+              <View style={styles.messagesContainer}>
+                <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                  {messages.length === 0 ? EmptyState : messages.map(renderMessage)}
+                </ScrollView>
+              </View>
+
+              {/* Input Area */}
+              <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.inputContainer, { borderTopColor: theme.colors.border }]}>
+                <View style={[styles.inputWrapper, { backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }]}>
+                  {selectedImage && (
+                    <View style={styles.selectedImageContainer}>
+                      <Image source={{ uri: selectedImage }} style={styles.selectedImagePreview} />
+                      <TouchableOpacity style={styles.clearImageButton} onPress={() => setSelectedImage(null)}>
+                        <MaterialCommunityIcons name="close-circle" size={18} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <TextInput style={[styles.input, { color: theme.colors.text }]} placeholder="Type your message..." placeholderTextColor={theme.colors.subtext} value={message} onChangeText={setMessage} multiline />
+
+                  <View style={styles.inputActions}>
+                    <TouchableOpacity style={styles.actionButton} onPress={pickImage}>
+                      <MaterialCommunityIcons name="image" size={22} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={takePhoto}>
+                      <MaterialCommunityIcons name="camera" size={22} color={theme.colors.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.sendButton,
+                        {
+                          backgroundColor: message.trim() || selectedImage ? theme.colors.primary : theme.dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+                        },
+                      ]}
+                      onPress={handleSend}
+                      disabled={!message.trim() && !selectedImage}
+                    >
+                      <MaterialCommunityIcons name="send" size={20} color={message.trim() || selectedImage ? "#FFFFFF" : theme.colors.subtext} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </KeyboardAvoidingView>
+            </SafeAreaView>
+          </LinearGradient>
+        </Animated.View>
+      </Modal>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
+    overflow: "hidden",
+    marginHorizontal: 16,
+    marginTop: 0,
   },
-  centerContent: {
-    justifyContent: "center",
-    alignItems: "center",
+  gradientOverlay: {
     flex: 1,
+    borderRadius: 22,
+  },
+  modalGradient: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  // Modal styles
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  modalContainer: {
+    flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    paddingTop: 30,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  headerSpacer: {
+    width: 42, // Match close button width for centering title
+  },
+  // Message area styles
+  messageArea: {
+    flex: 1,
+    display: "flex",
   },
   messagesContainer: {
     flex: 1,
-    paddingHorizontal: 5,
-    paddingTop: 10,
-    paddingBottom: 10,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    gap: 12,
   },
   emptyStateContainer: {
-    alignItems: "center",
+    flex: 1,
     justifyContent: "center",
+    alignItems: "center",
     padding: 20,
+    marginTop: 60,
   },
   emptyStateText: {
-    color: "#999",
-    fontSize: 14,
     textAlign: "center",
-    marginTop: 12,
-    lineHeight: 20,
+    marginTop: 16,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
   messageWrapper: {
-    marginBottom: 6,
     flexDirection: "row",
-    alignItems: "flex-end",
-    position: "relative",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    zIndex: 1,
+    marginBottom: 16,
+    maxWidth: "85%",
   },
   userMessageWrapper: {
-    justifyContent: "flex-end",
+    alignSelf: "flex-end",
+    marginLeft: "auto",
   },
   aiMessageWrapper: {
-    justifyContent: "flex-start",
-  },
-  userMessage: {
-    alignSelf: "flex-end",
-    backgroundColor: "#e3f2fd",
-    borderBottomRightRadius: 4,
-  },
-  aiMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "#f8f9fa",
-    borderBottomLeftRadius: 4,
   },
   botAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#2C3F00",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
-    overflow: "hidden",
+    marginTop: 4,
   },
   avatarImage: {
-    width: 48,
-    height: 48,
-    resizeMode: "cover",
-  },
-  userAvatar: {
-    display: "none", // Hide user avatar
-  },
-  messageContent: {
-    maxWidth: "90%", // Increased since we're not showing user avatar
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
-    borderRadius: 12,
-    padding: 8,
-    paddingBottom: 20, // Space for timestamp at bottom
-    position: "relative",
-  },
-  aiMessageContent: {
-    backgroundColor: "#f8fbff",
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    borderBottomLeftRadius: 4,
-    alignSelf: "flex-start",
-    borderLeftWidth: 3,
-    borderLeftColor: "#2C3F00",
-  },
-  userMessageContent: {
-    backgroundColor: "#e0e8cf",
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 4,
-    alignSelf: "flex-end",
-  },
-  messageText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#333",
-    marginBottom: 4,
-  },
-  aiMessageText: {
-    color: "#2c3e50",
-  },
-  messageImage: {
-    width: "100%",
-    height: 160,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  messageTime: {
-    position: "absolute",
-    bottom: 3,
-    right: 8,
-    fontSize: 10,
-    color: "rgba(0,0,0,0.4)",
-    fontWeight: "400",
-  },
-  actionButtons: {
-    position: "absolute",
-    top: -24,
-    right: 5,
-    flexDirection: "row",
-    borderRadius: 12,
-    zIndex: 999,
-  },
-  actionButton: {
-    backgroundColor: "white",
-    padding: 5,
-    justifyContent: "center",
-    alignItems: "center",
     width: 26,
     height: 26,
     borderRadius: 13,
-    marginHorizontal: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#eaeaea",
   },
-  actionButtonDelete: {
-    backgroundColor: "#2C3F00",
-    borderColor: "#2C3F00",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    top: -80,
-    borderWidth: 1,
+  messageContent: {
     borderRadius: 20,
-    minHeight: 56,
-    paddingBottom: Platform.OS === "ios" ? 16 : 12,
+    padding: 12,
     position: "relative",
-    zIndex: 10, // Increased zIndex to ensure this is above other components
-    elevation: 10, // Increased elevation for Android
   },
-  inputContainerWithKeyboard: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    paddingBottom: Platform.OS === "ios" ? 30 : 20,
+  userMessageContent: {
+    borderTopRightRadius: 4,
+  },
+  aiMessageContent: {
+    borderTopLeftRadius: 4,
+    borderLeftWidth: 3,
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  aiMessageText: {
+    fontSize: 15,
+  },
+  bulletItem: {
+    paddingLeft: 8,
+  },
+  messageTime: {
+    fontSize: 11,
+    alignSelf: "flex-end",
+    marginTop: 4,
+    opacity: 0.6,
+  },
+  messageImageContainer: {
     position: "relative",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    marginBottom: 8,
+  },
+  messageImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
+  },
+  imageLoadingIndicator: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderRadius: 12,
+  },
+  // Input area
+  inputContainer: {
+    padding: 12,
+    borderTopWidth: 1,
   },
   inputWrapper: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    marginRight: 8,
-    backgroundColor: "white",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   input: {
     flex: 1,
-    minHeight: 36,
-    maxHeight: 80,
-    fontSize: 14,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    fontSize: 15,
+    maxHeight: 100,
   },
-  imageButtons: {
+  inputActions: {
     flexDirection: "row",
-  },
-  imageButton: {
-    padding: 6,
-    justifyContent: "center",
     alignItems: "center",
+    gap: 12,
+  },
+  actionButton: {
+    padding: 6,
   },
   sendButton: {
-    backgroundColor: "#2C3F00",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 1,
-    elevation: 1,
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#c0c7b1",
-  },
-  sendButtonUploading: {
-    backgroundColor: "#bdcf99",
-  },
-  editButton: {
-    backgroundColor: "#4CD964",
-  },
-  // Enhanced image preview styles
-  previewModalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.7)",
-  },
-  previewModal: {
-    width: "90%",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 16,
-    color: "#333",
-    textAlign: "center",
-  },
-  previewImageContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  previewImage: {
-    width: "100%",
-    height: 300,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: "#f5f5f5",
-  },
-  previewCaption: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  previewButtons: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "space-between",
-  },
-  previewButton: {
-    padding: 12,
-    borderRadius: 10,
-    flex: 1,
-    marginHorizontal: 6,
-    alignItems: "center",
-  },
-  continueButton: {
-    backgroundColor: "#2C3F00",
-  },
-  cancelButton: {
-    backgroundColor: "#2C3F00",
-  },
-  previewButtonText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: "#666",
-    fontSize: 14,
-    textAlign: "center",
   },
   selectedImageContainer: {
-    marginHorizontal: 12,
-    marginBottom: 8,
     position: "relative",
+    marginRight: 12,
   },
-  selectedImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 6,
+  selectedImagePreview: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
   },
   clearImageButton: {
     position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#2C3F00",
+    top: -8,
+    right: -8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 10,
     width: 20,
     height: 20,
-    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  messageEditing: {
-    borderWidth: 2,
-    borderColor: "#4CD964",
-  },
-
-  editingIndicator: {
-    position: "absolute",
-    top: -24,
-    left: 8,
-    backgroundColor: "#4CD964",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    width: 60,
-  },
-
-  editingText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-
-  activeActionButton: {
-    backgroundColor: "#4CD964",
-    borderColor: "#4CD964",
-  },
-
-  // Menu button (3 dots)
-  menuButton: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    zIndex: 2,
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    opacity: 0.7,
-  },
-
-  // Message actions menu
+  // Message menu
   messageMenu: {
-    backgroundColor: "white",
-    borderRadius: 8,
+    position: "absolute",
+    borderRadius: 12,
+    width: 130,
+    borderWidth: 1,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 10,
-    width: 140,
-    zIndex: 9999,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
-
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    paddingHorizontal: 15,
+    padding: 12,
+    gap: 8,
   },
-
   menuItemText: {
-    marginLeft: 8,
     fontSize: 14,
-    color: "#333",
   },
-
   menuDivider: {
     height: 1,
-    backgroundColor: "#eee",
     width: "100%",
   },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.1)",
-  },
-
-  bulletItem: {
-    paddingLeft: 8,
-    marginTop: 2,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  messageImageContainer: {
-    position: "relative",
-  },
-
-  imageLoadingIndicator: {
+  menuButton: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 8,
+    right: 8,
+    padding: 4,
+  },
+  // Loading overlay
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Empty state container
+  emptyContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: "center",
+    opacity: 0.7,
   },
 })

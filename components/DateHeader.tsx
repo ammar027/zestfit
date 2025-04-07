@@ -6,6 +6,8 @@ import { format, addDays, subDays, isAfter, startOfWeek, getDay, isSameDay, isTo
 import CalendarPicker from "react-native-calendar-picker"
 import { useTheme } from "../theme"
 import { AppTheme } from "../theme/types"
+import { DrawerActions, NavigationProp, ParamListBase, useNavigation } from "@react-navigation/native"
+import { LinearGradient } from "expo-linear-gradient"
 
 interface DateHeaderProps {
   date: Date
@@ -18,6 +20,7 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
   const [isDatePickerVisible, setDatePickerVisible] = useState(false)
   const [weekDates, setWeekDates] = useState<Date[]>([])
   const [weekStartDate, setWeekStartDate] = useState<Date>(startOfWeek(date))
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
 
   // Calculate the week dates when the week start date changes
   useEffect(() => {
@@ -142,44 +145,39 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.card }]}>
-      {/* Top Row - Date and Controls */}
-      <View style={styles.headerRow}>
-        <View style={styles.dateDisplay}>
-          <TouchableOpacity style={styles.dateButton} onPress={() => setDatePickerVisible(true)} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="calendar-blank-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.dateText, { color: theme.colors.text }]}>{monthDay}</Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      {/* Date Header Card */}
+      <View style={[styles.dateHeaderCard, {}]}>
+       
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+              <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.dateButton, { borderColor: theme.colors.border, borderWidth: 0.5 }]} onPress={() => setDatePickerVisible(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="calendar-blank-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+              <Text style={[styles.dateText, { color: theme.colors.text }]}>{format(date, "MMM d")}</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.navigationButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }]} onPress={handlePreviousWeek}>
-          <MaterialCommunityIcons name="chevron-left" size={20} color={theme.colors.text} />
-        </TouchableOpacity>
+            <View style={styles.navigationContainer}>
+              <TouchableOpacity style={styles.navigationButton} onPress={handlePreviousWeek}>
+                <MaterialCommunityIcons name="chevron-left" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.navigationButton,
-            {
-              backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-              opacity: isNextWeekAvailable ? 1 : 0.5,
-            },
-          ]}
-          onPress={handleNextWeek}
-          disabled={!isNextWeekAvailable}
-        >
-          <MaterialCommunityIcons name="chevron-right" size={20} color={isNextWeekAvailable ? theme.colors.text : theme.colors.subtext} />
-        </TouchableOpacity>
+              <TouchableOpacity style={[styles.navigationButton, { opacity: isNextWeekAvailable ? 1 : 0.5 }]} onPress={handleNextWeek} disabled={!isNextWeekAvailable}>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={isNextWeekAvailable ? theme.colors.text : theme.colors.subtext} />
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.controls}>
-          <TouchableOpacity style={[styles.controlButton, { backgroundColor: theme.colors.primary + "10" }]} onPress={() => handleDateChange(new Date())}>
-            <Text style={[styles.controlButtonText, { color: theme.colors.primary }]}>Today</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={[styles.todayButton, { borderColor: theme.colors.border, borderWidth: 0.5 }]} onPress={() => handleDateChange(new Date())}>
+              <Text style={[styles.todayButtonText, { color: theme.colors.primary }]}>Today</Text>
+            </TouchableOpacity>
+          </View>
       </View>
 
-      {/* Week View with swipe gesture support */}
-      <View
-        style={styles.weekContainer}
+      {/* Week View Card */}
+      <LinearGradient
+        colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]}
+        style={[styles.weekCard, { borderColor: theme.colors.border }]}
         onTouchStart={(e) => {
           ;(e.currentTarget as any).startX = e.nativeEvent.pageX
         }}
@@ -199,33 +197,35 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
           const isFuture = isFutureDate(dayDate)
 
           return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.dayButton,
-                { width: buttonWidth - 2 },
-                isSelected && {
-                  backgroundColor: theme.colors.primary + "15",
-                  borderColor: theme.colors.primary,
-                  borderBottomWidth: 2,
-                },
-                isFuture && styles.futureDayButton,
-              ]}
-              onPress={() => !isFuture && handleWeekDateSelect(dayDate)}
-              activeOpacity={isFuture ? 1 : 0.5}
-              disabled={isFuture}
-            >
-              <Text style={[styles.dayNameText, { color: theme.colors.subtext }, isSelected && { color: theme.colors.primary }]}>{dayName}</Text>
-              <Text style={[styles.dayNumText, { color: theme.colors.text }, isSelected && { color: theme.colors.primary, fontWeight: "bold" }, isDayToday && { fontWeight: "bold", color: theme.colors.primary }]}>{dayNum}</Text>
+            <TouchableOpacity key={index} style={[styles.dayButton, { width: buttonWidth - 2 }, isSelected && styles.selectedDayButton, isFuture && styles.futureDayButton, { backgroundColor: isSelected ? theme.colors.primary + "15" : "transparent", borderColor: theme.colors.border }]} onPress={() => !isFuture && handleWeekDateSelect(dayDate)} activeOpacity={isFuture ? 1 : 0.7} disabled={isFuture}>
+              <Text
+                style={[
+                  styles.dayNameText,
+                  {
+                    color: isSelected ? theme.colors.primary : theme.colors.subtext,
+                  },
+                ]}
+              >
+                {dayName}
+              </Text>
+              <Text
+                style={[
+                  styles.dayNumText,
+                  {
+                    color: isSelected ? theme.colors.primary : theme.colors.text,
+                  },
+                ]}
+              >
+                {dayNum}
+              </Text>
               {isDayToday && <View style={[styles.todayDot, { backgroundColor: theme.colors.primary }]} />}
-              {/* {isFuture && <MaterialCommunityIcons name="lock-outline" size={10} color={theme.dark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)"} style={styles.futureIcon} />} */}
             </TouchableOpacity>
           )
         })}
-      </View>
+      </LinearGradient>
 
       {/* Enhanced Date Picker Modal */}
-      <Modal transparent={true} animationType="slide" visible={isDatePickerVisible} onRequestClose={() => setDatePickerVisible(false)}>
+      <Modal transparent={true} statusBarTranslucent animationType="slide" visible={isDatePickerVisible} onRequestClose={() => setDatePickerVisible(false)}>
         <SafeAreaView style={styles.modalSafeArea}>
           <View style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
             <View style={[styles.modalContainer, { backgroundColor: theme.colors.card }]}>
@@ -240,7 +240,7 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
               </View>
 
               <View style={styles.calendarContainer}>
-                <CalendarPicker onDateChange={handleDateChange} selectedStartDate={date} maxDate={new Date()} selectedDayColor={theme.colors.primary} selectedDayTextColor="#FFFFFF" textStyle={{ color: theme.colors.text }} todayBackgroundColor={theme.colors.border} todayTextStyle={{ color: theme.colors.primary, fontWeight: "bold" }} width={Dimensions.get("window").width - 48} monthTitleStyle={{ color: theme.colors.text, fontSize: 16, fontWeight: "600" }} yearTitleStyle={{ color: theme.colors.text, fontSize: 16, fontWeight: "600" }} dayLabels={["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]} />
+                <CalendarPicker onDateChange={handleDateChange} selectedStartDate={date} maxDate={new Date()} selectedDayColor={theme.colors.primary} selectedDayTextColor="#FFFFFF" textStyle={{ color: theme.colors.text }} todayBackgroundColor={theme.colors.border} todayTextStyle={{ color: theme.colors.secondary, fontWeight: "bold" }} width={Dimensions.get("window").width - 48} monthTitleStyle={{ color: theme.colors.text, fontSize: 16, fontWeight: "600" }} yearTitleStyle={{ color: theme.colors.text, fontSize: 16, fontWeight: "600" }} dayLabels={["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]} />
               </View>
 
               <TouchableOpacity style={[styles.applyButton, { backgroundColor: theme.colors.primary }]} onPress={() => setDatePickerVisible(false)}>
@@ -256,109 +256,95 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 12,
+    paddingHorizontal: 19,
+    paddingTop: 12,
+    gap: 10,
+  },
+  gradientOverlay: {
+    borderRadius: 17,
+    padding: 2,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    marginRight: 0,
+  },
+  dateHeaderCard: {
+    padding: 2,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  dateDisplay: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   dateButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.02)",
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(52, 199, 89, 0.1)",
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 15,
+    right: 25,
   },
   dateText: {
     fontSize: 15,
     fontWeight: "600",
   },
-  yearDisplay: {
-    alignItems: "center",
-  },
-  yearText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  controls: {
+  navigationContainer: {
     flexDirection: "row",
-    alignItems: "center",
-  },
-  controlButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  controlButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  weekNavigationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    paddingHorizontal: 4,
+    gap: 4,
   },
   navigationButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: 20,
   },
-  weekLabel: {
-    fontSize: 13,
-    fontWeight: "500",
+  todayButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: "rgba(52, 199, 89, 0.1)",
   },
-  weekContainer: {
+  todayButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  weekCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginHorizontal: 0,
-    paddingVertical: 2,
+    padding: 5,
+    borderRadius: 17,
+    borderWidth: 1,
   },
   dayButton: {
-    height: 60,
-    borderRadius: 8,
+    height: 45,
     justifyContent: "center",
     alignItems: "center",
     marginHorizontal: 1,
-    paddingVertical: 6,
+    borderRadius: 13,
+    paddingVertical: 15,
+  },
+  selectedDayButton: {
+    borderColor: "transparent",
+    borderWidth: 1,
   },
   futureDayButton: {
     opacity: 0.5,
-    backgroundColor: "rgba(0,0,0,0.02)",
-  },
-  futureDayText: {
-    opacity: 0.5,
-  },
-  futureIcon: {
-    position: "absolute",
-    bottom: 7,
   },
   dayNameText: {
     fontSize: 13,
     marginBottom: 2,
+    fontWeight: "500",
   },
   dayNumText: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 14,
+    fontWeight: "600",
   },
   todayDot: {
     width: 4,

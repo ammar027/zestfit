@@ -1,20 +1,104 @@
-import React, { useState, useEffect, useContext } from "react"
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, SafeAreaView, Image, KeyboardAvoidingView, Platform, Keyboard, Dimensions } from "react-native"
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"
+import React, { useState, useEffect, useContext, useRef } from "react"
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, SafeAreaView, Platform, Keyboard, Switch, Animated, Pressable } from "react-native"
+import { useNavigation, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import { supabase } from "../utils/supabaseClient"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { AuthContext } from "../App"
 import { useTheme } from "../theme"
-import ThemeToggle from "../components/ThemeToggle"
-import { ProfileData, RootStackParamList } from "../types/navigation"
+
+type ProfileData = {
+  full_name: string
+  username: string
+  age: string
+  height: string
+  weight: string
+  gender: string
+  goal: string
+  activity_level: string
+  medical_conditions: string
+}
+
+// Add type definitions at the top of the file
+type ProfileCardProps = {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap
+  title: string
+  subtitle?: string
+  onPress: () => void
+  theme: any // Using any for simplicity, ideally should use proper theme type
+  isPrimary?: boolean
+}
+
+// Component for stacked card navigation
+const ProfileCard = ({ icon, title, subtitle, onPress, theme, isPrimary = false }: ProfileCardProps) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      friction: 8,
+    }).start()
+  }
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 5,
+    }).start()
+  }
+
+  return (
+    <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ marginBottom: 16 }}>
+      <Animated.View
+        style={[
+          styles.profileCard,
+          {
+            backgroundColor: isPrimary ? (theme.dark ? "rgba(52, 199, 89, 0.15)" : "rgba(52, 199, 89, 0.08)") : theme.dark ? "rgba(255, 255, 255, 0.05)" : theme.colors.card,
+            borderColor: isPrimary ? theme.colors.primary : theme.colors.border,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconContainer}>
+            <MaterialCommunityIcons name={icon} size={24} color={isPrimary ? theme.colors.primary : theme.colors.text} />
+          </View>
+          <View style={styles.cardContent}>
+            <Text
+              style={[
+                styles.cardTitle,
+                {
+                  color: isPrimary ? theme.colors.primary : theme.colors.text,
+                  fontWeight: isPrimary ? "700" : "600",
+                },
+              ]}
+            >
+              {title}
+            </Text>
+            {subtitle && <Text style={[styles.cardSubtitle, { color: theme.colors.subtext }]}>{subtitle}</Text>}
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={isPrimary ? theme.colors.primary : theme.colors.subtext} />
+        </View>
+      </Animated.View>
+    </Pressable>
+  )
+}
 
 export default function ProfileScreen() {
-  const navigation = useNavigation<any>()
-  const route = useRoute<RouteProp<RootStackParamList, "Tabs">>()
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const [userId, setUserId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
   const { setIsLoggedIn: setAppIsLoggedIn } = useContext(AuthContext)
-  const { theme } = useTheme()
+  const { theme, colorScheme, toggleColorScheme } = useTheme()
+  const spinValue = useRef(new Animated.Value(0)).current
+  const welcomeOpacity = useRef(new Animated.Value(0)).current
+  const cardsTranslateY = useRef(new Animated.Value(20)).current
+
+  // Declare loading state earlier in the component
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
 
   const [profile, setProfile] = useState<ProfileData>({
     full_name: "",
@@ -26,20 +110,41 @@ export default function ProfileScreen() {
     goal: "",
     activity_level: "",
     medical_conditions: "",
-    avatar_url: null,
   })
 
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [keyboardVisible, setKeyboardVisible] = useState(false)
-  const { height: screenHeight } = Dimensions.get("window")
-
-  // Check for updated profile from the details screen
+  // Trigger spin animation when theme changes
   useEffect(() => {
-    if (route.params && "updatedProfile" in route.params) {
-      setProfile(route.params.updatedProfile as ProfileData)
+    Animated.timing(spinValue, {
+      toValue: colorScheme === "dark" ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start()
+  }, [colorScheme, spinValue])
+
+  // Animation for content when loaded
+  useEffect(() => {
+    if (!loading && isLoggedIn) {
+      Animated.parallel([
+        Animated.timing(welcomeOpacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardsTranslateY, {
+          toValue: 0,
+          friction: 7,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start()
     }
-  }, [route.params])
+  }, [loading, isLoggedIn])
+
+  // Create the rotation interpolation
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  })
 
   // Load profile data from Supabase on mount
   useEffect(() => {
@@ -110,7 +215,6 @@ export default function ProfileScreen() {
           goal: data.goal || "",
           activity_level: data.activity_level || "",
           medical_conditions: data.medical_conditions || "",
-          avatar_url: data.avatar_url,
         })
       } else {
         // If no profile exists yet, just use auth data
@@ -186,358 +290,334 @@ export default function ProfileScreen() {
     navigation.navigate("Auth" as never)
   }
 
-  const navigateToPersonalDetails = () => {
-    // Navigate to the personal details screen with the profile data
-    navigation.navigate("PersonalDetails", { userId, profile })
+  const navigateToPersonalInfo = () => {
+    // Create a function that accepts updated profile data
+    const handleSavePersonalInfo = async (updatedProfile: ProfileData) => {
+      // Update the local profile state
+      setProfile(updatedProfile)
+      // Call the original saveProfile function with the updated data
+      return saveProfile()
+    }
+
+    // Navigate to the Personal Info screen with profile data and save handler
+    navigation.navigate("PersonalInfo", {
+      profile,
+      saveProfile: handleSavePersonalInfo,
+    })
   }
 
-  if (loading) {
+  const navigateToFitnessInfo = () => {
+    // Create a function that accepts updated profile data
+    const handleSaveFitnessInfo = async (updatedProfile: ProfileData) => {
+      // Update the local profile state
+      setProfile(updatedProfile)
+      // Call the original saveProfile function with the updated data
+      return saveProfile()
+    }
+
+    // Navigate to the Fitness Info screen with profile data and save handler
+    navigation.navigate("FitnessInfo", {
+      profile,
+      saveProfile: handleSaveFitnessInfo,
+    })
+  }
+
+  const navigateToWeightTracker = () => {
+    navigation.navigate("Weight")
+  }
+
+  const navigateToWaterTracker = () => {
+    navigation.navigate("Water")
+  }
+
+  // Theme toggle component
+  const ThemeToggle = () => {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={styles.themeToggleContainer}>
+        <View style={styles.themeToggleRow}>
+          <Animated.View style={{ transform: [{ rotate: spin }], marginRight: 12 }}>
+            <MaterialCommunityIcons name={colorScheme === "dark" ? "weather-night" : "white-balance-sunny"} size={24} color={theme.colors.primary} />
+          </Animated.View>
+          <Text style={[styles.themeToggleText, { color: theme.colors.text }]}>{colorScheme === "dark" ? "Dark Mode" : "Light Mode"}</Text>
+        </View>
+        <Switch
+          value={colorScheme === "dark"}
+          onValueChange={toggleColorScheme}
+          trackColor={{
+            false: Platform.OS === "ios" ? "#E9E9EA" : "rgba(0,0,0,0.1)",
+            true: theme.colors.primary,
+          }}
+          thumbColor={Platform.OS === "ios" ? "#FFFFFF" : colorScheme === "dark" ? theme.colors.primary : "#FFFFFF"}
+          ios_backgroundColor="#E9E9EA"
+        />
       </View>
     )
   }
+
+  // // Loading indicator
+  // if (loading) {
+  //   return (
+  //     <View style={[styles.centeredContainer, { backgroundColor: theme.colors.background }]}>
+  //       <ActivityIndicator size="large" color={theme.colors.primary} />
+  //     </View>
+  //   )
+  // }
 
   // Not logged in view
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View
-          style={[
-            styles.header,
-            {
-              backgroundColor: theme.colors.card,
-              shadowColor: theme.colors.text,
-            },
-          ]}
-        >
+        <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
-
-          <View style={styles.headerRight}>
-            <ThemeToggle />
-          </View>
+          <ThemeToggle />
         </View>
-        <View style={styles.notLoggedInContainer}>
-          <MaterialCommunityIcons name="account-lock" size={70} color={theme.colors.subtext} />
-          <Text style={[styles.notLoggedInText, { color: theme.colors.text }]}>You need to sign in to view and manage your profile</Text>
-          <TouchableOpacity style={[styles.signInButton, { backgroundColor: theme.colors.primary }]} onPress={navigateToAuth}>
-            <Text style={styles.signInButtonText}>Sign In</Text>
-          </TouchableOpacity>
+
+        <View style={styles.centeredContainer}>
+          <View style={styles.loginPromptContainer}>
+            <MaterialCommunityIcons name="shield-account" size={52} color={theme.colors.primary} style={styles.loginIcon} />
+            <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Welcome to ZestFit</Text>
+            <Text style={[styles.loginSubtitle, { color: theme.colors.subtext }]}>Sign in to access your profile, track workouts, and reach your fitness goals</Text>
+
+            <TouchableOpacity style={[styles.signInButton, { backgroundColor: theme.colors.primary }]} onPress={navigateToAuth}>
+              <View style={styles.signInButtonContent}>
+                <Text style={styles.signInButtonText}>Sign In</Text>
+                <MaterialCommunityIcons name="arrow-right" size={20} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     )
   }
 
+  // Logged in view
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: theme.colors.card,
-            shadowColor: theme.colors.text,
-          },
-        ]}
-      >
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{profile.full_name || "Profile"}</Text>
-        <View style={styles.headerRight}>
-          <ThemeToggle />
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+        <ThemeToggle />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }} keyboardVerticalOffset={90}>
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Main Action Buttons */}
-          <View style={styles.mainButtonsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.mainActionButton,
-                {
-                  backgroundColor: theme.colors.card,
-                  shadowColor: theme.colors.text,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={navigateToPersonalDetails}
-            >
-              <MaterialCommunityIcons name="account-details" size={24} color={theme.colors.primary} />
-              <Text style={[styles.mainActionButtonText, { color: theme.colors.text }]}>Edit Personal Details</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Utilities Section */}
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Welcome Section */}
+        <Animated.View style={{ opacity: welcomeOpacity }}>
           <View
             style={[
-              styles.section,
+              styles.welcomeContainer,
               {
-                backgroundColor: theme.colors.card,
-                shadowColor: theme.colors.text,
-                borderColor: theme.colors.border,
+                backgroundColor: theme.dark ? "rgba(255,255,255,0.03)" : "rgba(52, 199, 89, 0.03)",
+                borderColor: theme.dark ? "rgba(255,255,255,0.1)" : "rgba(52, 199, 89, 0.2)",
               },
             ]}
           >
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Utilities</Text>
-
-            <View style={styles.utilities}>
-              <TouchableOpacity
-                style={[
-                  styles.utilityCard,
-                  {
-                    backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                    shadowColor: theme.colors.text,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => navigation.navigate("Trackers" as never)}
-              >
-                <MaterialCommunityIcons name="scale" size={32} color={theme.colors.primary} />
-                <Text style={[styles.utilityCardTitle, { color: theme.colors.text }]}>Weight Tracker</Text>
-                <Text style={[styles.utilityCardDescription, { color: theme.colors.subtext }]}>Track and manage weight progress</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.utilityCard,
-                  {
-                    backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                    shadowColor: theme.colors.text,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => navigation.navigate("WaterTracker" as never)}
-              >
-                <MaterialCommunityIcons name="water" size={32} color={theme.colors.primary} />
-                <Text style={[styles.utilityCardTitle, { color: theme.colors.text }]}>Water Tracker</Text>
-                <Text style={[styles.utilityCardDescription, { color: theme.colors.subtext }]}>Track your daily water intake</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.utilities, { marginTop: 12 }]}>
-              <TouchableOpacity
-                style={[
-                  styles.utilityCard,
-                  {
-                    backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                    shadowColor: theme.colors.text,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => navigation.navigate("Goals" as never)}
-              >
-                <MaterialCommunityIcons name="clipboard-list" size={32} color={theme.colors.primary} />
-                <Text style={[styles.utilityCardTitle, { color: theme.colors.text }]}>Goals Editor</Text>
-                <Text style={[styles.utilityCardDescription, { color: theme.colors.subtext }]}>Manage nutrition targets</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.utilityCard,
-                  {
-                    backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                    shadowColor: theme.colors.text,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => navigation.navigate("Chat" as never)}
-              >
-                <MaterialCommunityIcons name="chat-processing" size={32} color={theme.colors.primary} />
-                <Text style={[styles.utilityCardTitle, { color: theme.colors.text }]}>Nutrition Chat</Text>
-                <Text style={[styles.utilityCardDescription, { color: theme.colors.subtext }]}>Log and track daily meals</Text>
-              </TouchableOpacity>
+            <View style={styles.welcomeContent}>
+              <Text style={[styles.welcomeText, { color: theme.colors.text }]}>
+                Hello, <Text style={{ fontWeight: "700" }}>{profile.full_name || "User"}</Text>
+              </Text>
+              <Text style={[styles.emailText, { color: theme.colors.subtext }]}>{profile.username}</Text>
             </View>
           </View>
+        </Animated.View>
 
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            style={[
-              styles.signOutButton,
-              {
-                backgroundColor: theme.dark ? "#382121" : "#FEE2E2",
-                shadowColor: theme.colors.text,
-                borderColor: theme.dark ? "#4D2C2C" : "#FECACA",
-              },
-            ]}
-            onPress={handleLogout}
-          >
-            <MaterialCommunityIcons name="logout" size={24} color={theme.dark ? "#FFAAAA" : "#B91C1C"} />
-            <Text style={[styles.signOutButtonText, { color: theme.dark ? "#FFAAAA" : "#B91C1C" }]}>Sign Out</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {/* Cards Section */}
+        <Animated.View style={{ transform: [{ translateY: cardsTranslateY }] }}>
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Profile Information</Text>
+
+            <ProfileCard icon="account-details" title="Personal Information" subtitle="Name, email, age, and more" onPress={navigateToPersonalInfo} theme={theme} isPrimary={true} />
+
+            <ProfileCard icon="run" title="Fitness Information" subtitle="Goals, activity level, medical conditions" onPress={navigateToFitnessInfo} theme={theme} />
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Tracking</Text>
+
+            <ProfileCard icon="scale-bathroom" title="Weight Tracker" subtitle="Monitor your weight progress" onPress={navigateToWeightTracker} theme={theme} />
+
+            <ProfileCard icon="water" title="Water Tracker" subtitle="Track your daily hydration" onPress={navigateToWaterTracker} theme={theme} />
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account</Text>
+
+            <TouchableOpacity
+              style={[
+                styles.logoutButton,
+                {
+                  backgroundColor: theme.dark ? "rgba(255,59,48,0.1)" : "rgba(255,59,48,0.05)",
+                  borderColor: theme.dark ? "rgba(255,59,48,0.3)" : "rgba(255,59,48,0.2)",
+                },
+              ]}
+              onPress={handleLogout}
+            >
+              <View style={styles.logoutContent}>
+                <MaterialCommunityIcons name="logout" size={22} color={theme.dark ? "#FF6B6B" : "#FF3B30"} />
+                <Text style={[styles.logoutText, { color: theme.dark ? "#FF6B6B" : "#FF3B30" }]}>Sign Out</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-// Regular styles without theming
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatarContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  nameText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  emailText: {
-    fontSize: 16,
-  },
-  section: {
-    marginBottom: 14,
-    borderRadius: 16,
-    padding: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-    borderWidth: 1,
-  },
-  utilities: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  utilityCard: {
-    width: "48%",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    borderWidth: 1,
-    minHeight: 135,
-  },
-  utilityCardTitle: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  utilityCardDescription: {
-    marginTop: 4,
-    fontSize: 12,
-    textAlign: "center",
-  },
-  themeToggleContainer: {
-    alignItems: "center",
-    padding: 8,
-  },
-  themeToggleLabel: {
-    fontSize: 16,
-  },
-  themeSection: {
-    width: "85%",
-    marginTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notLoggedInContainer: {
+  centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
-  notLoggedInText: {
+  header: {
+    paddingHorizontal: 15,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    right: 35,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  themeToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  themeToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  themeToggleText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  welcomeContainer: {
+    borderRadius: 16,
+    marginVertical: 16,
+    padding: 20,
+    borderWidth: 1,
+  },
+  welcomeContent: {
+    flexDirection: "column",
+  },
+  welcomeText: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  emailText: {
+    fontSize: 14,
+  },
+  sectionContainer: {
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  profileCard: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cardIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+  },
+  loginPromptContainer: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  loginIcon: {
+    marginBottom: 16,
+  },
+  loginTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  loginSubtitle: {
     fontSize: 16,
     textAlign: "center",
-    marginTop: 16,
     marginBottom: 32,
+    lineHeight: 22,
   },
   signInButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-    borderRadius: 12,
+    width: "100%",
+    height: 54,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  signInButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   signInButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
-  mainButtonsContainer: {
-    marginBottom: 16,
-  },
-  mainActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    borderWidth: 1,
-    elevation: 1,
-  },
-  mainActionButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 12,
-  },
-  signOutButton: {
-    flexDirection: "row",
-    alignItems: "center",
+  logoutButton: {
+    height: 50,
+    borderRadius: 14,
     justifyContent: "center",
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 20,
-    marginBottom: 30,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    alignItems: "center",
     borderWidth: 1,
   },
-  signOutButtonText: {
+  logoutContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  logoutText: {
     fontSize: 16,
     fontWeight: "600",
-    marginLeft: 8,
+  },
+  menuButton: {
+    padding: 8,
   },
 })

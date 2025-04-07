@@ -1,6 +1,7 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, TextInput, ScrollView, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { useNavigation, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { saveUserGoals } from "../utils/supabaseutils"
 import { useTheme } from "../theme"
@@ -25,6 +26,20 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
   const [macroGoals, setMacroGoals] = useState(initialMacroGoals)
   const [isSaving, setIsSaving] = useState(false)
   const { theme } = useTheme()
+  const insets = useSafeAreaInsets()
+
+  // Custom header component
+  const Header = () => {
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Daily Goals</Text>
+        <View style={{ width: 28 }} />
+      </View>
+    )
+  }
 
   const handleSaveGoals = async () => {
     try {
@@ -60,29 +75,11 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
     }
   }
 
-  const insets = useSafeAreaInsets()
-  const { width, height } = Dimensions.get("window")
-
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          backgroundColor: theme.colors.background,
-        },
-      ]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
-      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-          <MaterialCommunityIcons name="arrow-left" size={28} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Daily Goals</Text>
-      </View>
+
+      <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={[styles.section, { backgroundColor: theme.colors.card, shadowColor: theme.colors.text }]}>
@@ -199,10 +196,25 @@ export default function GoalsEditorScreen({ navigation, route }: { navigation: a
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
-  header: { flexDirection: "row", alignItems: "center", padding: 16, backgroundColor: "white", elevation: 2 },
-  headerTitle: { fontSize: 20, fontWeight: "bold", flex: 1, textAlign: "center" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { View, Text, StyleSheet, StatusBar, Dimensions, Alert, ActivityIndicator, TouchableOpacity } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import DateHeader from "../components/DateHeader"
-import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native"
+import { useNavigation, useRoute, useFocusEffect, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import MacroCards from "../components/MacroCards"
 import ChatInterface from "../components/ChatInterface"
 import { supabase, enhancedSupabase, queryCache } from "../utils/supabaseClient"
@@ -10,6 +10,7 @@ import { getDailyNutrition, saveDailyNutrition, getWaterTrackerSettings, saveUse
 import { getLocalDailyNutrition, saveLocalDailyNutrition, getLocalUserGoals, saveLocalUserGoals, getLocalWaterSettings, saveLocalWaterSettings } from "../utils/localStorage"
 import { useTheme } from "../theme"
 import { useToast } from "../utils/toast"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
 
 // Define types for TypeScript
 interface User {
@@ -86,31 +87,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
     zIndex: 10,
+  },
+  customHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    zIndex: 10,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
   },
   content: {
     flex: 1,
   },
   statsSection: {
     paddingTop: 1,
-    marginTop: 7,
   },
   chatSection: {
     flex: 1,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     overflow: "hidden",
-    marginTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   loadingText: {
     marginTop: 20,
@@ -157,7 +159,7 @@ export default function HomeScreen() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
-  const navigation = useNavigation<any>()
+  const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const insets = useSafeAreaInsets()
   const { height } = Dimensions.get("window")
 
@@ -451,20 +453,17 @@ export default function HomeScreen() {
         cupsConsumed: 0,
       }
 
-      if (currentSettings.cupsConsumed < (globalWaterTrackerSettings?.daily_water_goal || 4)) {
-        const newData = {
-          ...prevData,
-          waterTrackerSettings: {
-            ...currentSettings,
-            cupsConsumed: currentSettings.cupsConsumed + 1,
-          },
-        }
-
-        saveDateData(newData)
-        return newData
+      // Remove the limit check to allow unlimited increments
+      const newData = {
+        ...prevData,
+        waterTrackerSettings: {
+          ...currentSettings,
+          cupsConsumed: currentSettings.cupsConsumed + 1,
+        },
       }
 
-      return prevData
+      saveDateData(newData)
+      return newData
     })
   }, [saveDateData, globalWaterTrackerSettings])
 
@@ -583,20 +582,26 @@ export default function HomeScreen() {
     }
   }, [selectedDate, loadDateData, user, dataLoaded])
 
+  // Custom header component
+  const CustomHeader = () => (
+    <View style={[styles.customHeader, { paddingTop: insets.top + 8 }]}>
+      <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+        <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+      </TouchableOpacity>
+    </View>
+  )
+
   // Main screen
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
-
-      <View style={[styles.headerContainer, { backgroundColor: theme.colors.card }]}>
-        <View style={{ paddingTop: insets.top }}>
-          <DateHeader date={selectedDate} onDateChange={handleDateChange} />
-        </View>
-      </View>
-
+      <DateHeader date={selectedDate} onDateChange={handleDateChange} />
       <View style={[styles.content, getContentStyle(height, insets)]}>
         <View style={styles.statsSection}>
-          <MacroCards dailyStats={dateSpecificData.dailyStats || { calories: { food: 0, exercise: 0 }, macros: { carbs: 0, protein: 0, fat: 0 } }} calorieGoal={dateSpecificData.calorieGoal || 0} macroGoals={dateSpecificData.macroGoals || { carbs: 0, protein: 0, fat: 0 }} waterTrackerSettings={dateSpecificData.waterTrackerSettings} onEditGoals={handleSetMacroGoals} onEditWater={() => navigation.navigate("WaterTracker")} />
+          <MacroCards dailyStats={dateSpecificData.dailyStats || { calories: { food: 0, exercise: 0 }, macros: { carbs: 0, protein: 0, fat: 0 } }} calorieGoal={dateSpecificData.calorieGoal || 0} macroGoals={dateSpecificData.macroGoals || { carbs: 0, protein: 0, fat: 0 }} setCalorieGoal={handleSetCalorieGoal} setMacroGoals={handleSetMacroGoals} waterTrackerSettings={dateSpecificData.waterTrackerSettings} isWaterTrackerEnabled={globalWaterTrackerSettings?.enabled || false} onIncrementWater={handleIncrementWater} onDecrementWater={handleDecrementWater} onEditWater={() => navigation.navigate("Water")} />
+        </View>
+        <View style={[styles.chatSection, {}]}>
+          <ChatInterface date={formattedDate} onUpdateStats={handleUpdateStats} user={user} />
         </View>
       </View>
 
