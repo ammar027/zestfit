@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions, Alert, Image, SafeAreaView, GestureResponderEvent, PanResponder } from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions, Alert, Image, SafeAreaView, GestureResponderEvent, PanResponder, Animated } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { format, addDays, subDays, isAfter, startOfWeek, getDay, isSameDay, isToday as isDateToday } from "date-fns"
 // @ts-ignore - Ignoring type checking for third-party module
@@ -13,14 +13,63 @@ interface DateHeaderProps {
   date: Date
   onDateChange?: (date: Date) => void
   setDate?: (date: Date) => void
+  dailyStats?: any
+  waterTrackerSettings?: any
 }
 
-export default function DateHeader({ date, onDateChange, setDate }: DateHeaderProps) {
+export default function DateHeader({ date, onDateChange, setDate, dailyStats, waterTrackerSettings }: DateHeaderProps) {
   const { theme } = useTheme()
   const [isDatePickerVisible, setDatePickerVisible] = useState(false)
   const [weekDates, setWeekDates] = useState<Date[]>([])
   const [weekStartDate, setWeekStartDate] = useState<Date>(startOfWeek(date))
   const navigation = useNavigation<NavigationProp<ParamListBase>>()
+
+  // Animation values for greeting
+  const fadeAnim = React.useRef(new Animated.Value(0)).current
+  const slideAnim = React.useRef(new Animated.Value(20)).current
+
+  // Run entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [])
+
+  // Calculate greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good morning"
+    if (hour < 18) return "Good afternoon"
+    return "Good evening"
+  }
+
+  // Get greeting icon based on time of day
+  const getGreetingIcon = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "white-balance-sunny"
+    if (hour < 18) return "weather-partly-cloudy"
+    return "weather-night"
+  }
+
+  // Motivational messages
+  const motivationalMessages = ["Every step counts towards success!", "Keep pushing towards your goals!", "Small choices, big results!", "Consistency is the key!", "You're making great progress!", "Stay focused and stay strong!"]
+
+  // Get random motivational message
+  const [motivationalMessage, setMotivationalMessage] = useState("")
+  useEffect(() => {
+    const randomIndex = Math.floor(Math.random() * motivationalMessages.length)
+    setMotivationalMessage(motivationalMessages[randomIndex])
+  }, [])
 
   // Calculate the week dates when the week start date changes
   useEffect(() => {
@@ -146,32 +195,55 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
 
   return (
     <View style={styles.container}>
-      {/* Date Header Card */}
-      <View style={[styles.dateHeaderCard, {}]}>
-       
+      {/* Date Header Card with Greeting */}
+      <View style={styles.dateHeaderCard}>
+        <View style={styles.headerContent}>
+          {/* Top header row with menu and date button */}
           <View style={styles.headerRow}>
-            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-              <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.dateButton, { borderColor: theme.colors.border, borderWidth: 0.5 }]} onPress={() => setDatePickerVisible(true)} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="calendar-blank-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
-              <Text style={[styles.dateText, { color: theme.colors.text }]}>{format(date, "MMM d")}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.navigationContainer}>
-              <TouchableOpacity style={styles.navigationButton} onPress={handlePreviousWeek}>
-                <MaterialCommunityIcons name="chevron-left" size={20} color={theme.colors.text} />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.navigationButton, { opacity: isNextWeekAvailable ? 1 : 0.5 }]} onPress={handleNextWeek} disabled={!isNextWeekAvailable}>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={isNextWeekAvailable ? theme.colors.text : theme.colors.subtext} />
-              </TouchableOpacity>
+            <View style={styles.greetingHeader}>
+              <MaterialCommunityIcons name={getGreetingIcon()} size={23} color={theme.colors.primary} style={styles.greetingIcon} />
+              <Text style={[styles.greetingText, { color: theme.colors.text }]}>{getGreeting()}</Text>
             </View>
 
-            <TouchableOpacity style={[styles.todayButton, { borderColor: theme.colors.border, borderWidth: 0.5 }]} onPress={() => handleDateChange(new Date())}>
-              <Text style={[styles.todayButtonText, { color: theme.colors.primary }]}>Today</Text>
+            <TouchableOpacity
+              style={[
+                styles.dateButtonUpdated,
+                {
+                  borderColor: theme.colors.border,
+                  borderWidth: 1,
+                  backgroundColor: theme.dark ? "rgba(255,255,255,0.08)" : "rgba(76,175,80,0.1)",
+                },
+              ]}
+              onPress={() => setDatePickerVisible(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+              <Text style={[styles.dateText, { color: theme.colors.text }]}>{format(date, "MMM d")}</Text>
             </TouchableOpacity>
           </View>
+
+          <Animated.View
+            style={[
+              styles.motivationalContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.motivationalInner,
+                {
+                  backgroundColor: theme.dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                },
+              ]}
+            >
+              <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#4CAF50" style={styles.motivationalIcon} />
+              <Text style={[styles.motivationalText, { color: theme.colors.subtext }]}>{motivationalMessage}</Text>
+            </View>
+          </Animated.View>
+        </View>
       </View>
 
       {/* Week View Card */}
@@ -197,7 +269,22 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
           const isFuture = isFutureDate(dayDate)
 
           return (
-            <TouchableOpacity key={index} style={[styles.dayButton, { width: buttonWidth - 2 }, isSelected && styles.selectedDayButton, isFuture && styles.futureDayButton, { backgroundColor: isSelected ? theme.colors.primary + "15" : "transparent", borderColor: theme.colors.border }]} onPress={() => !isFuture && handleWeekDateSelect(dayDate)} activeOpacity={isFuture ? 1 : 0.7} disabled={isFuture}>
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.dayButton,
+                { width: buttonWidth - 2 },
+                isSelected && styles.selectedDayButton,
+                isFuture && styles.futureDayButton,
+                {
+                  backgroundColor: isSelected ? theme.colors.primary + "15" : "transparent",
+                  borderColor: theme.colors.border,
+                },
+              ]}
+              onPress={() => !isFuture && handleWeekDateSelect(dayDate)}
+              activeOpacity={isFuture ? 1 : 0.7}
+              disabled={isFuture}
+            >
               <Text
                 style={[
                   styles.dayNameText,
@@ -256,63 +343,71 @@ export default function DateHeader({ date, onDateChange, setDate }: DateHeaderPr
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 19,
+    paddingHorizontal: 18,
     paddingTop: 12,
     gap: 10,
   },
-  gradientOverlay: {
-    borderRadius: 17,
-    padding: 2,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    marginRight: 0,
+  headerContent: {
+    gap: 12,
   },
   dateHeaderCard: {
     padding: 2,
+    marginBottom: 5,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingVertical: 0,
   },
-  dateButton: {
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  greetingHeader: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(52, 199, 89, 0.1)",
-    paddingHorizontal: 8,
+    flex: 1,
+    marginLeft: 8,
+  },
+  greetingIcon: {
+    marginRight: 8,
+  },
+  greetingText: {
+    fontSize: 22,
+    fontWeight: "600",
+  },
+  dateButtonUpdated: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 15,
-    right: 25,
+    borderRadius: 25,
+    marginLeft: 10,
   },
   dateText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
   },
-  navigationContainer: {
+  motivationalContainer: {
+    alignItems: "flex-start",
+  },
+  motivationalInner: {
     flexDirection: "row",
-    gap: 4,
-  },
-  navigationButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.03)",
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 15,
   },
-  todayButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: "rgba(52, 199, 89, 0.1)",
+  motivationalIcon: {
+    marginRight: 6,
   },
-  todayButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+  motivationalText: {
+    fontSize: 15,
+    lineHeight: 20,
   },
   weekCard: {
     flexDirection: "row",

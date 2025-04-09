@@ -1,20 +1,23 @@
 import React, { useEffect, useRef } from "react"
 import { View, Text, StyleSheet, Image, TouchableOpacity, SafeAreaView, Dimensions, StatusBar, Animated, BackHandler } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
-import { useNavigation } from "@react-navigation/native"
-import { DrawerNavigationProp } from "@react-navigation/drawer"
-import { RootStackParamList } from "../types/navigation"
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import { CommonActions } from "@react-navigation/native"
+import { useRoute } from "@react-navigation/native"
 import { useTheme } from "../theme"
 import { useToast } from "../utils/toast"
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
-type WelcomeScreenNavigationProp = DrawerNavigationProp<RootStackParamList, "Welcome">
+// Define the type for route params
+type WelcomeScreenParams = {
+  onLoginPress: () => void
+  onContinuePress: () => void
+}
 
 export default function WelcomeScreen() {
   const { theme } = useTheme()
   const { showToast } = useToast()
-  const navigation = useNavigation<WelcomeScreenNavigationProp>()
+  const route = useRoute()
+  const params = route.params as WelcomeScreenParams
   const screenWidth = Dimensions.get("window").width
 
   // Animation values
@@ -78,77 +81,57 @@ export default function WelcomeScreen() {
     return () => backHandler.remove()
   }, [fadeAnim, slideAnim, buttonFadeAnim, featureAnimValues])
 
-  const handleContinueWithoutLogin = async () => {
-    try {
-      // Mark that the welcome screen has been shown
-      await AsyncStorage.setItem("HAS_SEEN_WELCOME", "true")
-
-      // Force a complete navigation stack reset to prevent back navigation
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Home" }],
-      })
-
-      // Show success toast
-      showToast("Welcome to ZestFit! You can sign in anytime from your profile.", "info", 5000)
-
-      // Additional safety measure - delay a bit and reset again to ensure clean slate
-      setTimeout(() => {
-        try {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: "Home" }],
-            }),
-          )
-        } catch (e) {
-          console.error("Error in delayed navigation reset:", e)
-        }
-      }, 300)
-    } catch (error) {
-      console.error("Error navigating from welcome screen:", error)
-      // Fallback navigation if there's an error
-      navigation.navigate("Home")
+  const handleContinueWithoutLogin = () => {
+    showToast("Welcome to ZestFit! You can sign in anytime from your profile.", "info", 5000)
+    if (params?.onContinuePress) {
+      params.onContinuePress()
     }
   }
 
-  const handleLogin = async () => {
-    try {
-      // Mark that the welcome screen has been shown
-      await AsyncStorage.setItem("HAS_SEEN_WELCOME", "true")
-
-      // Force a complete navigation stack reset to prevent back navigation
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Auth" }],
-      })
-
-      // Additional safety measure - delay a bit and reset again to ensure clean slate
-      setTimeout(() => {
-        try {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: "Auth" }],
-            }),
-          )
-        } catch (e) {
-          console.error("Error in delayed navigation reset:", e)
-        }
-      }, 300)
-    } catch (error) {
-      console.error("Error navigating from welcome screen:", error)
-      // Fallback navigation if there's an error
-      navigation.navigate("Auth")
+  const handleLogin = () => {
+    if (params?.onLoginPress) {
+      params.onLoginPress()
     }
   }
+
+  // Define features with proper types
+  const features = [
+    {
+      icon: "food-apple-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
+      title: "Nutrition Tracking",
+      description: "Track your daily meals and nutrition intake with ease",
+      animValue: featureAnimValues[0],
+      color: "#FF6B6B",
+    },
+    {
+      icon: "water-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
+      title: "Water Monitoring",
+      description: "Stay hydrated with our water consumption tracker",
+      animValue: featureAnimValues[1],
+      color: "#3498db",
+    },
+    {
+      icon: "scale-bathroom" as keyof typeof MaterialCommunityIcons.glyphMap,
+      title: "Weight Tracking",
+      description: "Monitor your weight and body measurements over time",
+      animValue: featureAnimValues[2],
+      color: "#4ECDC4",
+    },
+    {
+      icon: "chart-line" as keyof typeof MaterialCommunityIcons.glyphMap,
+      title: "Progress Analytics",
+      description: "Visualize your journey with detailed charts and insights",
+      animValue: featureAnimValues[3],
+      color: "#FFA726",
+    },
+  ]
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor="transparent" translucent={true} />
 
       <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <Image source={require("../assets/icons/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
+        <Image source={theme.dark ? require("../assets/icons/adaptive-icon-dark.png") : require("../assets/icons/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
       </Animated.View>
 
       <Animated.View
@@ -163,74 +146,51 @@ export default function WelcomeScreen() {
         <Text style={[styles.welcomeDescription, { color: theme.colors.subtext }]}>Your personal health and fitness companion to help you achieve your wellness goals</Text>
 
         <View style={styles.featuresContainer}>
-          {[
-            {
-              icon: "food-apple",
-              title: "Nutrition Tracking",
-              description: "Track your daily meals and nutrition intake with ease",
-              animValue: featureAnimValues[0],
-            },
-            {
-              icon: "water",
-              title: "Water Monitoring",
-              description: "Stay hydrated with our water consumption tracker",
-              animValue: featureAnimValues[1],
-            },
-            {
-              icon: "scale-bathroom",
-              title: "Weight Tracking",
-              description: "Monitor your weight and body measurements over time",
-              animValue: featureAnimValues[2],
-            },
-            {
-              icon: "chart-line",
-              title: "Progress Analytics",
-              description: "Visualize your journey with detailed charts and insights",
-              animValue: featureAnimValues[3],
-            },
-          ].map((feature, index) => (
+          {features.map((feature, index) => (
             <Animated.View
               key={index}
               style={[
-                styles.featureItem,
+                styles.featureCard,
                 {
-                  backgroundColor: theme.colors.card,
-                  borderColor: theme.colors.border,
-                  shadowColor: theme.colors.text,
                   opacity: fadeAnim,
                   transform: [{ translateY: feature.animValue }],
                 },
               ]}
             >
-              <MaterialCommunityIcons name={feature.icon} size={28} color={theme.colors.primary} />
-              <View style={styles.featureTextContainer}>
-                <Text style={[styles.featureTitle, { color: theme.colors.text }]}>{feature.title}</Text>
-                <Text style={[styles.featureDescription, { color: theme.colors.subtext }]}>{feature.description}</Text>
-              </View>
+              <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.blurContainer, { borderColor: theme.colors.border }]}>
+                <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.featureGradient}>
+                  <View style={styles.featureIconContainer}>
+                    <LinearGradient colors={[`${feature.color}20`, `${feature.color}10`]} style={styles.iconGradient}>
+                      <MaterialCommunityIcons name={feature.icon} size={28} color={feature.color} />
+                    </LinearGradient>
+                  </View>
+                  <View style={styles.featureTextContainer}>
+                    <Text style={[styles.featureTitle, { color: theme.colors.text }]}>{feature.title}</Text>
+                    <Text style={[styles.featureDescription, { color: theme.colors.subtext }]}>{feature.description}</Text>
+                  </View>
+                </LinearGradient>
+              </BlurView>
             </Animated.View>
           ))}
         </View>
       </Animated.View>
 
       <Animated.View style={[styles.buttonsContainer, { opacity: buttonFadeAnim }]}>
-        <TouchableOpacity style={[styles.button, styles.loginButton, { backgroundColor: theme.colors.button.primary }]} onPress={handleLogin} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="account" size={22} color={theme.colors.button.text} style={styles.buttonIcon} />
-          <Text style={[styles.loginButtonText, { color: theme.colors.button.text }]}>Sign In / Create Account</Text>
+        <TouchableOpacity onPress={handleLogin} activeOpacity={0.7} style={styles.buttonWrapper}>
+          <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={styles.buttonBlurContainer}>
+            <LinearGradient colors={[theme.colors.primary, `${theme.colors.primary}DD`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.button, styles.loginButton]}>
+              <MaterialCommunityIcons name="account" size={22} color="#FFFFFF" style={styles.buttonIcon} />
+              <Text style={styles.loginButtonText}>Sign In / Create Account</Text>
+            </LinearGradient>
+          </BlurView>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.button,
-            styles.skipButton,
-            {
-              backgroundColor: theme.colors.button.secondary,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          onPress={handleContinueWithoutLogin}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.skipButtonText, { color: theme.colors.text }]}>Continue Without Login</Text>
+        <TouchableOpacity onPress={handleContinueWithoutLogin} activeOpacity={0.7} style={styles.buttonWrapper}>
+          <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.buttonBlurContainer, { borderColor: theme.colors.border }]}>
+            <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={[styles.button, styles.skipButton]}>
+              <Text style={[styles.skipButtonText, { color: theme.colors.text }]}>Continue Without Login</Text>
+            </LinearGradient>
+          </BlurView>
         </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
@@ -240,6 +200,13 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  gradientBackground: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
   },
   header: {
     alignItems: "center",
@@ -267,21 +234,39 @@ const styles = StyleSheet.create({
   featuresContainer: {
     marginTop: 10,
   },
-  featureItem: {
+  featureCard: {
+    marginBottom: 15,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  blurContainer: {
+    overflow: "hidden",
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  featureGradient: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
     padding: 16,
     borderRadius: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    borderWidth: 1,
-    elevation: 2,
+  },
+  featureIconContainer: {
+    marginRight: 6,
+  },
+  iconGradient: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: "center",
+    alignItems: "center",
   },
   featureTextContainer: {
-    marginLeft: 16,
     flex: 1,
+    marginLeft: 12,
   },
   featureTitle: {
     fontSize: 18,
@@ -295,23 +280,32 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     padding: 24,
   },
+  buttonWrapper: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  buttonBlurContainer: {
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
   button: {
     height: 56,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
   },
   loginButton: {
     flexDirection: "row",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   skipButton: {
-    borderWidth: 1,
+    borderWidth: 0,
   },
   buttonIcon: {
     marginRight: 8,
@@ -319,6 +313,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#FFFFFF",
   },
   skipButtonText: {
     fontSize: 16,

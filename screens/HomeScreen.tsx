@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { View, Text, StyleSheet, StatusBar, Dimensions, Alert, ActivityIndicator, TouchableOpacity, Animated } from "react-native"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
+import { View, Text, StyleSheet, StatusBar, Dimensions, Alert, ActivityIndicator, TouchableOpacity } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import DateHeader from "../components/DateHeader"
 import { useNavigation, useRoute, useFocusEffect, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
@@ -12,7 +12,6 @@ import { useTheme } from "../theme"
 import { useToast } from "../utils/toast"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
-import { format } from "date-fns"
 
 // Define types for TypeScript
 interface User {
@@ -111,6 +110,7 @@ const styles = StyleSheet.create({
   },
   statsSection: {
     paddingTop: 1,
+    marginTop: 7,
   },
   chatSection: {
     flex: 1,
@@ -148,60 +148,6 @@ const styles = StyleSheet.create({
   loadingContent: {
     justifyContent: "center",
     alignItems: "center",
-  },
-  briefingContainer: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    borderRadius: 17,
-    overflow: "hidden",
-  },
-  briefingGradient: {
-    padding: 16,
-  },
-  briefingContent: {
-    gap: 12,
-  },
-  greetingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  greetingText: {
-    fontSize: 24,
-    fontWeight: "600",
-  },
-  timeText: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  motivationalText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  statsPreview: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: "rgba(0,0,0,0.1)",
   },
 })
 
@@ -638,108 +584,19 @@ export default function HomeScreen() {
     }
   }, [selectedDate, loadDateData, user, dataLoaded])
 
-  // Custom header component
-  const CustomHeader = () => (
-    <View style={[styles.customHeader, { paddingTop: insets.top + 8 }]}>
-      <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-        <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
-      </TouchableOpacity>
-    </View>
-  )
-
-  // Add greeting message based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return "Good morning"
-    if (hour < 18) return "Good afternoon"
-    return "Good evening"
-  }
-
-  // Add motivational messages
-  const motivationalMessages = ["Keep pushing towards your goals!", "Every step counts towards your success!", "You're making great progress!", "Stay focused and stay strong!", "Your dedication is inspiring!"]
-
-  // Get random motivational message
-  const [motivationalMessage, setMotivationalMessage] = useState("")
-  useEffect(() => {
-    const randomIndex = Math.floor(Math.random() * motivationalMessages.length)
-    setMotivationalMessage(motivationalMessages[randomIndex])
-  }, [])
-
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const slideAnim = useRef(new Animated.Value(50)).current
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }, [])
-
   // Main screen
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
-      <DateHeader date={selectedDate} onDateChange={handleDateChange} />
+      <DateHeader date={selectedDate} onDateChange={handleDateChange} dailyStats={dateSpecificData.dailyStats} waterTrackerSettings={dateSpecificData.waterTrackerSettings} />
 
-      {/* Daily Briefing Section */}
-      <Animated.View
-        style={[
-          styles.briefingContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.briefingGradient}>
-          <View style={styles.briefingContent}>
-            <View style={styles.greetingRow}>
-              <Text style={[styles.greetingText, { color: theme.colors.text }]}>{getGreeting()}</Text>
-              <Text style={[styles.timeText, { color: theme.colors.primary }]}>{format(new Date(), "h:mm a")}</Text>
-            </View>
-            <Text style={[styles.motivationalText, { color: theme.colors.subtext }]}>{motivationalMessage}</Text>
-
-            <View style={styles.statsPreview}>
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="food-apple" size={20} color={theme.colors.primary} />
-                <Text style={[styles.statValue, { color: theme.colors.text }]}>{dateSpecificData.dailyStats?.calories?.food || 0}</Text>
-                <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Calories</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="water" size={20} color={theme.colors.primary} />
-                <Text style={[styles.statValue, { color: theme.colors.text }]}>{dateSpecificData.waterTrackerSettings?.cupsConsumed || 0}</Text>
-                <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Cups</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="run" size={20} color={theme.colors.primary} />
-                <Text style={[styles.statValue, { color: theme.colors.text }]}>{dateSpecificData.dailyStats?.calories?.exercise || 0}</Text>
-                <Text style={[styles.statLabel, { color: theme.colors.subtext }]}>Burned</Text>
-              </View>
-            </View>
-          </View>
-        </LinearGradient>
-      </Animated.View>
-
-      <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={[styles.content, getContentStyle(height, insets), { borderRadius: 17, borderWidth: 1, borderColor: theme.colors.border }]}>
         <View style={styles.statsSection}>
           <MacroCards dailyStats={dateSpecificData.dailyStats || { calories: { food: 0, exercise: 0 }, macros: { carbs: 0, protein: 0, fat: 0 } }} calorieGoal={dateSpecificData.calorieGoal || 0} macroGoals={dateSpecificData.macroGoals || { carbs: 0, protein: 0, fat: 0 }} setCalorieGoal={handleSetCalorieGoal} setMacroGoals={handleSetMacroGoals} waterTrackerSettings={dateSpecificData.waterTrackerSettings} isWaterTrackerEnabled={globalWaterTrackerSettings?.enabled || false} onIncrementWater={handleIncrementWater} onDecrementWater={handleDecrementWater} onEditWater={() => navigation.navigate("Water")} />
         </View>
         <View style={[styles.chatSection, {}]}>
           <ChatInterface date={formattedDate} onUpdateStats={handleUpdateStats} user={user} />
         </View>
-      </LinearGradient>
 
       {isLoading && (
         <View style={[styles.loadingApp, { backgroundColor: theme.dark ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.9)" }]}>

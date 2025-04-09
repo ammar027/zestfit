@@ -1009,8 +1009,13 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   const EmptyState = useMemo(
     () => (
       <View style={styles.emptyStateContainer}>
-        <MaterialCommunityIcons name="food-apple" size={40} color={theme.colors.primary + "80"} />
-        <Text style={[styles.emptyStateText, { color: theme.colors.subtext }]}>Track your meals and exercises by typing them here or uploading food photos</Text>
+        <MaterialCommunityIcons name="food-apple-outline" size={48} color={theme.colors.primary + "80"} />
+        <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>No entries yet</Text>
+        <Text style={[styles.emptyStateText, { color: theme.colors.subtext }]}>Track your meals by typing or uploading photos. Exercise tracking is also available.</Text>
+        <TouchableOpacity style={[styles.emptyStateButton, { backgroundColor: theme.colors.primary + "20" }]} onPress={() => setMessage("I had ")}>
+          <MaterialCommunityIcons name="food" size={18} color={theme.colors.primary} />
+          <Text style={[styles.emptyStateButtonText, { color: theme.colors.primary }]}>Add a meal</Text>
+        </TouchableOpacity>
       </View>
     ),
     [theme],
@@ -1168,8 +1173,44 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
   // Calculate animated height for the collapsed view
   const animatedHeight = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [60, 60], // Keep the same height since we're using a modal
+    outputRange: [90, 90], // Increased height to show message preview
   })
+
+  // Get the most recent message for the preview
+  const mostRecentMessage = useMemo(() => {
+    if (messages.length === 0) return null
+
+    // Find the most recent AI message
+    const recentAiMessage = [...messages].reverse().find((msg) => msg.type === "ai")
+
+    return recentAiMessage || messages[messages.length - 1]
+  }, [messages])
+
+  // Format preview text
+  const getPreviewText = (message: Message | null) => {
+    if (!message) return "No recent conversations"
+
+    // For AI messages, extract the first line with nutrition info
+    if (message.type === "ai") {
+      const text = message.text
+      if (text.includes("Nutrition Info")) {
+        const caloriesMatch = text.match(/Calories: (\d+)/)
+        if (caloriesMatch) {
+          return `${caloriesMatch[0]} | Last tracked item`
+        }
+      }
+      if (text.includes("Exercise Calories")) {
+        const caloriesMatch = text.match(/(\d+) kcal/)
+        if (caloriesMatch) {
+          return `Burned ${caloriesMatch[1]} kcal | Last exercise`
+        }
+      }
+      return text.split("\n")[0]
+    }
+
+    // For user messages
+    return message.text.length > 40 ? `${message.text.substring(0, 40)}...` : message.text
+  }
 
   return (
     <>
@@ -1193,6 +1234,20 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
             </View>
             <MaterialCommunityIcons name="chevron-up" size={24} color={theme.colors.subtext} />
           </TouchableOpacity>
+
+          {/* Message preview in collapsed state */}
+          <View style={styles.previewContainer}>
+            {mostRecentMessage?.imageUri || mostRecentMessage?.imageUrl ? (
+              <View style={styles.previewImageContainer}>
+                <Image source={{ uri: mostRecentMessage.imageUri || mostRecentMessage.imageUrl }} style={styles.previewImage} resizeMode="cover" />
+              </View>
+            ) : (
+              <MaterialCommunityIcons name={mostRecentMessage?.type === "ai" ? "chart-box-outline" : "text-box-outline"} size={18} color={theme.colors.primary} style={styles.previewIcon} />
+            )}
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.previewText, { color: theme.colors.subtext }]}>
+              {getPreviewText(mostRecentMessage)}
+            </Text>
+          </View>
         </LinearGradient>
       </Animated.View>
 
@@ -1211,27 +1266,29 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
             },
           ]}
         >
-          <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.modalGradient}>
+          <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.9)", "rgba(20,20,30,0.95)"] : ["rgba(255,255,255,0.98)", "rgba(250,250,255,0.95)"]} style={styles.modalGradient}>
             <SafeAreaView style={{ flex: 1 }}>
               {/* Modal Header */}
               <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-                <TouchableOpacity style={styles.closeButton} onPress={closeChatModal}>
-                  <MaterialCommunityIcons name="chevron-down" size={26} color={theme.colors.text} />
+                <View style={styles.modalHeaderContent}>
+                  <MaterialCommunityIcons name="nutrition" size={22} color={theme.colors.primary} />
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Nutrition Assistant</Text>
+                </View>
+                <TouchableOpacity style={styles.closeModalButton} onPress={closeChatModal}>
+                  <MaterialCommunityIcons name="close" size={22} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Nutrition Assistant</Text>
-                <View style={styles.headerSpacer} />
               </View>
 
               {/* Messages Content */}
               <View style={styles.messagesContainer}>
-                <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                   {messages.length === 0 ? EmptyState : messages.map(renderMessage)}
                 </ScrollView>
               </View>
 
               {/* Input Area */}
               <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.inputContainer, { borderTopColor: theme.colors.border }]}>
-                <View style={[styles.inputWrapper, { backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }]}>
+                <View style={[styles.inputWrapper, { backgroundColor: theme.dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.03)" }]}>
                   {selectedImage && (
                     <View style={styles.selectedImageContainer}>
                       <Image source={{ uri: selectedImage }} style={styles.selectedImagePreview} />
@@ -1241,7 +1298,7 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                     </View>
                   )}
 
-                  <TextInput style={[styles.input, { color: theme.colors.text }]} placeholder="Type your message..." placeholderTextColor={theme.colors.subtext} value={message} onChangeText={setMessage} multiline />
+                  <TextInput style={[styles.input, { color: theme.colors.text }]} placeholder={editingMessage ? "Edit your message..." : "Type food, drinks, or exercise..."} placeholderTextColor={theme.colors.subtext} value={message} onChangeText={setMessage} multiline />
 
                   <View style={styles.inputActions}>
                     <TouchableOpacity style={styles.actionButton} onPress={pickImage}>
@@ -1261,10 +1318,26 @@ export default function ChatInterface({ date, onUpdateStats, user }: ChatInterfa
                       onPress={handleSend}
                       disabled={!message.trim() && !selectedImage}
                     >
-                      <MaterialCommunityIcons name="send" size={20} color={message.trim() || selectedImage ? "#FFFFFF" : theme.colors.subtext} />
+                      <MaterialCommunityIcons name={editingMessage ? "check" : "send"} size={20} color={message.trim() || selectedImage ? "#FFFFFF" : theme.colors.subtext} />
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {editingMessage && (
+                  <View style={styles.editingBar}>
+                    <Text style={[styles.editingText, { color: theme.colors.primary }]}>Editing message</Text>
+                    <TouchableOpacity
+                      style={styles.cancelEditButton}
+                      onPress={() => {
+                        setEditingMessage(null)
+                        setMessage("")
+                        setSelectedImage(null)
+                      }}
+                    >
+                      <Text style={[styles.cancelEditText, { color: theme.colors.error || "#ff5252" }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </KeyboardAvoidingView>
             </SafeAreaView>
           </LinearGradient>
@@ -1292,6 +1365,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
+    paddingBottom: 8,
   },
   headerContent: {
     flexDirection: "row",
@@ -1302,35 +1376,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  // Preview styles
+  previewContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  previewText: {
+    fontSize: 13,
+    flex: 1,
+  },
+  previewIcon: {
+    marginRight: 8,
+  },
+  previewImageContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    overflow: "hidden",
+    marginRight: 8,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
   // Modal styles
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContainer: {
     flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 24,
   },
   modalHeader: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    position: "relative",
+    marginTop: 15,
+  },
+  headerPill: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(150,150,150,0.25)",
+    position: "absolute",
+    top: 8,
+  },
+  modalHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    paddingTop: 30,
+    gap: 10,
+    paddingTop: 10,
   },
-  closeButton: {
-    padding: 8,
+  closeModalButton: {
+    position: "absolute",
+    right: 16,
+    top: 19,
+    padding: 5,
+    borderRadius: 20,
+    backgroundColor: "rgba(150,150,150,0.1)",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-  },
-  headerSpacer: {
-    width: 42, // Match close button width for centering title
   },
   // Message area styles
   messageArea: {
@@ -1352,19 +1472,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    marginTop: 60,
+    marginTop: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyStateText: {
     textAlign: "center",
-    marginTop: 16,
     fontSize: 15,
     lineHeight: 22,
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
+    marginBottom: 24,
+  },
+  emptyStateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  emptyStateButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+    marginLeft: 8,
   },
   messageWrapper: {
     flexDirection: "row",
     marginBottom: 16,
-    maxWidth: "85%",
+    maxWidth: "90%",
   },
   userMessageWrapper: {
     alignSelf: "flex-end",
@@ -1374,23 +1513,33 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   botAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   avatarImage: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   messageContent: {
     borderRadius: 20,
     padding: 12,
     position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   userMessageContent: {
     borderTopRightRadius: 4,
@@ -1447,6 +1596,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     maxHeight: 100,
+    paddingVertical: 8,
   },
   inputActions: {
     flexDirection: "row",
@@ -1454,23 +1604,28 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    padding: 6,
+    padding: 8,
+    borderRadius: 16,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
   selectedImageContainer: {
     position: "relative",
     marginRight: 12,
   },
   selectedImagePreview: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 10,
   },
   clearImageButton: {
     position: "absolute",
@@ -1482,6 +1637,27 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Editing bar
+  editingBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  editingText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  cancelEditButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  cancelEditText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
   // Message menu
   messageMenu: {

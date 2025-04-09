@@ -54,7 +54,7 @@ const darkColors: ThemeColors = {
   success: "#30D158", // Bright Green
   warning: "#FFD60A", // Bright Yellow
   error: "#FF453A", // Bright Red
-  statusBar: "#000000", // Status bar color
+  statusBar: "#0c0c12", // Status bar color
   input: {
     background: "#2C2C2E",
     text: "#FFFFFF",

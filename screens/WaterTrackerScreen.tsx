@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react"
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, Switch, TouchableOpacity, Modal, TextInput, Dimensions, ScrollView } from "react-native"
+import React, { useState, useEffect, useRef } from "react"
+import { View, Text, StyleSheet, SafeAreaView, StatusBar, Switch, TouchableOpacity, Modal, TextInput, Dimensions, ScrollView, Animated } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNavigation, useRoute, useFocusEffect, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
 import { useTheme } from "../theme"
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
 export default function WaterTrackerScreen() {
   const [enabled, setEnabled] = useState(false)
@@ -13,6 +15,26 @@ export default function WaterTrackerScreen() {
   const [isGoalModalVisible, setGoalModalVisible] = useState(false)
   const [tempGoal, setTempGoal] = useState(dailyWaterGoal.toString())
   const { theme } = useTheme()
+  const insets = useSafeAreaInsets()
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(20)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [])
 
   // Define cup size in ml (standard cup = 250ml)
   const CUP_SIZE_ML = 250
@@ -46,8 +68,6 @@ export default function WaterTrackerScreen() {
       }
     }, []),
   )
-
-  const insets = useSafeAreaInsets()
 
   const toggleSwitch = async () => {
     // Make sure we toggle from the current state
@@ -242,81 +262,68 @@ export default function WaterTrackerScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.statusBar} />
 
-      <Header />
-
       <ScrollView style={styles.scrollContainer}>
         {/* Enable/Disable Switch */}
-        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-          <View style={styles.switchContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Water Tracking</Text>
-            <Switch value={enabled} onValueChange={toggleSwitch} trackColor={{ false: "#767577", true: theme.colors.primary }} />
-          </View>
-        </View>
+        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.blurContainer, { borderColor: theme.colors.border }]}>
+            <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.gradientOverlay}>
+              <View style={styles.switchContainer}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Water Tracking</Text>
+                <Switch value={enabled} onValueChange={toggleSwitch} trackColor={{ false: "#767577", true: theme.colors.primary }} />
+              </View>
+            </LinearGradient>
+          </BlurView>
+        </Animated.View>
 
         {/* Daily Goal Section */}
-        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Daily Goal</Text>
-          <View style={styles.goalContainer}>
-            <Text style={[styles.goalText, { color: theme.colors.text }]}>
-              {dailyWaterGoal} cups ({goalLiters}L)
-            </Text>
-            <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.colors.primary }]} onPress={() => setGoalModalVisible(true)}>
-              <MaterialCommunityIcons name="pencil" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Progress Section */}
-        {/* <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Progress</Text>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: progressWidth, backgroundColor: theme.colors.primary }]} />
-            </View>
-            <Text style={[styles.progressText, { color: theme.colors.text }]}>
-              {cupsConsumed} of {dailyWaterGoal} cups ({consumedLiters}L)
-            </Text>
-          </View>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.primary }]} onPress={handleRemoveCup}>
-              <MaterialCommunityIcons name="minus" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.primary }]} onPress={handleAddCup}>
-              <MaterialCommunityIcons name="plus" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View> */}
+        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.blurContainer, { borderColor: theme.colors.border }]}>
+            <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.gradientOverlay}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Daily Goal</Text>
+              <View style={styles.goalContainer}>
+                <Text style={[styles.goalText, { color: theme.colors.text }]}>
+                  {dailyWaterGoal} cups ({goalLiters}L)
+                </Text>
+                <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.colors.primary + "20" }]} onPress={() => setGoalModalVisible(true)}>
+                  <MaterialCommunityIcons name="pencil" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </BlurView>
+        </Animated.View>
       </ScrollView>
 
       {/* Goal Setting Modal */}
       <Modal visible={isGoalModalVisible} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set Daily Water Goal</Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: theme.colors.input.text,
-                  backgroundColor: theme.colors.input.background,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              keyboardType="numeric"
-              value={tempGoal}
-              onChangeText={setTempGoal}
-              placeholder="Enter cups per day"
-              placeholderTextColor={theme.colors.input.placeholder}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, { backgroundColor: theme.colors.button.secondary }]} onPress={() => setGoalModalVisible(false)}>
-                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={saveWaterGoal}>
-                <Text style={[styles.saveButtonText, { color: theme.colors.secondaryButtonText }]}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.modalContent, { borderColor: theme.colors.border }]}>
+            <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.gradientOverlay}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Set Daily Water Goal</Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : theme.colors.input.background,
+                    color: theme.colors.input.text,
+                  },
+                ]}
+                keyboardType="numeric"
+                value={tempGoal}
+                onChangeText={setTempGoal}
+                placeholder="Enter cups per day"
+                placeholderTextColor={theme.colors.input.placeholder}
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "#ddd" }]} onPress={() => setGoalModalVisible(false)}>
+                  <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]} onPress={saveWaterGoal}>
+                  <Text style={[styles.saveButtonText, { color: theme.colors.secondaryButtonText }]}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </BlurView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -350,14 +357,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   section: {
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  },
+  blurContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  gradientOverlay: {
+    padding: 20,
+    borderRadius: 16,
   },
   switchContainer: {
     flexDirection: "row",
@@ -379,22 +388,21 @@ const styles = StyleSheet.create({
     fontWeight: "semibold",
   },
   editButton: {
-    padding: 5,
+    padding: 8,
     borderRadius: 8,
   },
   progressContainer: {
     marginVertical: 16,
   },
   progressBar: {
-    height: 12,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 6,
+    height: 8,
+    borderRadius: 4,
     overflow: "hidden",
     marginBottom: 8,
   },
   progressFill: {
     height: "100%",
-    borderRadius: 6,
+    borderRadius: 4,
   },
   progressText: {
     fontSize: 16,
@@ -406,9 +414,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   button: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -420,8 +428,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    padding: 20,
-    borderRadius: 12,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
   },
   modalTitle: {
     fontSize: 18,

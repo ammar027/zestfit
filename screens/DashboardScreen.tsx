@@ -639,11 +639,14 @@ export default function DashboardScreen() {
   const Header = () => {
     return (
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Dashboard</Text>
-        <View style={{ width: 28 }} />
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Dashboard</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={[styles.refreshButton, { backgroundColor: theme.colors.card }]} onPress={handleRefresh}>
+              <MaterialCommunityIcons name="refresh" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     )
   }
@@ -747,22 +750,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 10,
   },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "700",
   },
-  menuButton: {
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  refreshButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   scrollView: {
     flex: 1,

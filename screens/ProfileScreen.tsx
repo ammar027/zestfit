@@ -5,6 +5,8 @@ import { supabase } from "../utils/supabaseClient"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { AuthContext } from "../App"
 import { useTheme } from "../theme"
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
 type ProfileData = {
   full_name: string
@@ -89,14 +91,15 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>()
   const [userId, setUserId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const { setIsLoggedIn: setAppIsLoggedIn } = useContext(AuthContext)
   const { theme, colorScheme, toggleColorScheme } = useTheme()
   const spinValue = useRef(new Animated.Value(0)).current
   const welcomeOpacity = useRef(new Animated.Value(0)).current
   const cardsTranslateY = useRef(new Animated.Value(20)).current
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(20)).current
 
-  // Declare loading state earlier in the component
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
 
@@ -123,7 +126,7 @@ export default function ProfileScreen() {
 
   // Animation for content when loaded
   useEffect(() => {
-    if (!loading && isLoggedIn) {
+    if (!isLoading && isLoggedIn) {
       Animated.parallel([
         Animated.timing(welcomeOpacity, {
           toValue: 1,
@@ -138,7 +141,7 @@ export default function ProfileScreen() {
         }),
       ]).start()
     }
-  }, [loading, isLoggedIn])
+  }, [isLoading, isLoggedIn])
 
   // Create the rotation interpolation
   const spin = spinValue.interpolate({
@@ -146,10 +149,68 @@ export default function ProfileScreen() {
     outputRange: ["0deg", "180deg"],
   })
 
-  // Load profile data from Supabase on mount
+  // Add auth state listener
   useEffect(() => {
-    getCurrentUser()
+    // Set up auth state listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id)
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (session?.user) {
+          setUserId(session.user.id)
+          setIsLoggedIn(true)
+          setAppIsLoggedIn(true)
+          loadProfile(session.user.id)
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUserId(null)
+        setIsLoggedIn(false)
+        setAppIsLoggedIn(false)
+      }
+    })
+
+    // Initial session check
+    checkSession()
+
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [])
+
+  const checkSession = async () => {
+    try {
+      setIsLoading(true)
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error("Session error:", error)
+        setIsLoggedIn(false)
+        setAppIsLoggedIn(false)
+        return
+      }
+
+      if (session?.user) {
+        setUserId(session.user.id)
+        setIsLoggedIn(true)
+        setAppIsLoggedIn(true)
+        await loadProfile(session.user.id)
+      } else {
+        setIsLoggedIn(false)
+        setAppIsLoggedIn(false)
+      }
+    } catch (err) {
+      console.error("Error checking session:", err)
+      setIsLoggedIn(false)
+      setAppIsLoggedIn(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Handle keyboard events
   useEffect(() => {
@@ -162,31 +223,21 @@ export default function ProfileScreen() {
     }
   }, [])
 
-  const getCurrentUser = async () => {
-    try {
-      setLoading(true)
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-
-      if (userData && userData.user) {
-        setUserId(userData.user.id)
-        setIsLoggedIn(true)
-        setAppIsLoggedIn(true)
-        await loadProfile(userData.user.id)
-      } else {
-        // No user is logged in
-        setIsLoggedIn(false)
-        setAppIsLoggedIn(false)
-      }
-    } catch (err) {
-      console.error("Error getting current user:", err)
-      setIsLoggedIn(false)
-      setAppIsLoggedIn(false)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Start fade-in animation on component mount
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [])
 
   const loadProfile = async (id: string) => {
     try {
@@ -270,18 +321,15 @@ export default function ProfileScreen() {
   }
 
   const handleLogout = async () => {
-    setLoading(true)
+    setIsLoading(true)
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      setIsLoggedIn(false)
-      setAppIsLoggedIn(false)
-      // Stay on profile tab - it will show auth screen since we're logged out
     } catch (err) {
       console.error("Logout error:", err)
       Alert.alert("Error", "Failed to log out")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -332,36 +380,85 @@ export default function ProfileScreen() {
 
   // Theme toggle component
   const ThemeToggle = () => {
+    const toggleScale = useRef(new Animated.Value(1)).current
+    const iconOpacity = useRef(new Animated.Value(1)).current
+
+    const handlePressIn = () => {
+      Animated.parallel([
+        Animated.spring(toggleScale, {
+          toValue: 0.92,
+          useNativeDriver: true,
+          friction: 8,
+        }),
+        Animated.timing(iconOpacity, {
+          toValue: 0.7,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+
+    const handlePressOut = () => {
+      Animated.parallel([
+        Animated.spring(toggleScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 5,
+        }),
+        Animated.timing(iconOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+
     return (
-      <View style={styles.themeToggleContainer}>
-        <View style={styles.themeToggleRow}>
-          <Animated.View style={{ transform: [{ rotate: spin }], marginRight: 12 }}>
-            <MaterialCommunityIcons name={colorScheme === "dark" ? "weather-night" : "white-balance-sunny"} size={24} color={theme.colors.primary} />
+      <Pressable onPress={toggleColorScheme} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.themeToggleContainer}>
+        <Animated.View
+          style={[
+            styles.themeToggleContent,
+            {
+              transform: [{ scale: toggleScale }],
+              backgroundColor: theme.dark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.03)",
+              borderColor: theme.colors.border,
+              borderWidth: 0.5,
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.themeToggleIcon,
+              {
+                transform: [{ rotate: spin }],
+                backgroundColor: theme.dark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.08)",
+                opacity: iconOpacity,
+                borderColor: theme.colors.border,
+                borderWidth: 0.3,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons name={colorScheme === "dark" ? "weather-night" : "white-balance-sunny"} size={20} color={theme.colors.primary} />
           </Animated.View>
-          <Text style={[styles.themeToggleText, { color: theme.colors.text }]}>{colorScheme === "dark" ? "Dark Mode" : "Light Mode"}</Text>
-        </View>
-        <Switch
-          value={colorScheme === "dark"}
-          onValueChange={toggleColorScheme}
-          trackColor={{
-            false: Platform.OS === "ios" ? "#E9E9EA" : "rgba(0,0,0,0.1)",
-            true: theme.colors.primary,
-          }}
-          thumbColor={Platform.OS === "ios" ? "#FFFFFF" : colorScheme === "dark" ? theme.colors.primary : "#FFFFFF"}
-          ios_backgroundColor="#E9E9EA"
-        />
-      </View>
+        </Animated.View>
+      </Pressable>
     )
   }
 
-  // // Loading indicator
-  // if (loading) {
-  //   return (
-  //     <View style={[styles.centeredContainer, { backgroundColor: theme.colors.background }]}>
-  //       <ActivityIndicator size="large" color={theme.colors.primary} />
-  //     </View>
-  //   )
-  // }
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+          <ThemeToggle />
+        </View>
+        <View style={[styles.centeredContainer, { justifyContent: "center" }]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   // Not logged in view
   if (!isLoggedIn) {
@@ -373,18 +470,36 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.centeredContainer}>
-          <View style={styles.loginPromptContainer}>
-            <MaterialCommunityIcons name="shield-account" size={52} color={theme.colors.primary} style={styles.loginIcon} />
-            <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Welcome to ZestFit</Text>
-            <Text style={[styles.loginSubtitle, { color: theme.colors.subtext }]}>Sign in to access your profile, track workouts, and reach your fitness goals</Text>
+          <Animated.View
+            style={[
+              styles.loginPromptContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.blurContainer, { borderColor: theme.colors.border }]}>
+              <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.gradientContainer}>
+                <View style={styles.loginIconContainer}>
+                  <MaterialCommunityIcons name="shield-account" size={64} color={theme.colors.primary} style={styles.loginIcon} />
+                </View>
+                <Text style={[styles.loginTitle, { color: theme.colors.text }]}>Welcome to ZestFit</Text>
+                <Text style={[styles.loginSubtitle, { color: theme.colors.subtext }]}>Sign in to access your profile, track workouts, and reach your fitness goals</Text>
 
-            <TouchableOpacity style={[styles.signInButton, { backgroundColor: theme.colors.primary }]} onPress={navigateToAuth}>
-              <View style={styles.signInButtonContent}>
-                <Text style={styles.signInButtonText}>Sign In</Text>
-                <MaterialCommunityIcons name="arrow-right" size={20} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity style={styles.signInButtonWrapper} onPress={navigateToAuth} activeOpacity={0.8}>
+                  <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={styles.buttonBlurContainer}>
+                    <LinearGradient colors={[theme.colors.primary, `${theme.colors.primary}DD`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.signInButton}>
+                      <View style={styles.signInButtonContent}>
+                        <MaterialCommunityIcons name="login" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                        <Text style={styles.signInButtonText}>Sign In</Text>
+                      </View>
+                    </LinearGradient>
+                  </BlurView>
+                </TouchableOpacity>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
         </View>
       </SafeAreaView>
     )
@@ -394,9 +509,6 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-          <MaterialCommunityIcons name="menu" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
         <ThemeToggle />
       </View>
@@ -432,13 +544,13 @@ export default function ProfileScreen() {
             <ProfileCard icon="run" title="Fitness Information" subtitle="Goals, activity level, medical conditions" onPress={navigateToFitnessInfo} theme={theme} />
           </View>
 
-          <View style={styles.sectionContainer}>
+          {/* <View style={styles.sectionContainer}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Tracking</Text>
 
             <ProfileCard icon="scale-bathroom" title="Weight Tracker" subtitle="Monitor your weight progress" onPress={navigateToWeightTracker} theme={theme} />
 
             <ProfileCard icon="water" title="Water Tracker" subtitle="Track your daily hydration" onPress={navigateToWaterTracker} theme={theme} />
-          </View>
+          </View> */}
 
           <View style={styles.sectionContainer}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account</Text>
@@ -474,6 +586,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+    marginTop: -90,
   },
   header: {
     paddingHorizontal: 15,
@@ -485,7 +598,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    right: 35,
   },
   scrollContainer: {
     flex: 1,
@@ -495,17 +607,25 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   themeToggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  themeToggleRow: {
-    flexDirection: "row",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
     alignItems: "center",
   },
-  themeToggleText: {
-    fontSize: 14,
-    fontWeight: "500",
+  themeToggleContent: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  themeToggleIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   welcomeContainer: {
     borderRadius: 16,
@@ -524,7 +644,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   sectionContainer: {
-    marginTop: 24,
+    marginTop: 8,
     marginBottom: 8,
   },
   sectionTitle: {
@@ -567,13 +687,32 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    marginTop: -90,
+  },
+  blurContainer: {
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    width: "100%",
+  },
+  gradientContainer: {
+    padding: 32,
+    borderRadius: 24,
+    alignItems: "center",
+  },
+  loginIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
   },
   loginIcon: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   loginTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "700",
     marginBottom: 12,
     textAlign: "center",
@@ -582,19 +721,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     marginBottom: 32,
-    lineHeight: 22,
+    lineHeight: 24,
+    paddingHorizontal: 20,
+  },
+  signInButtonWrapper: {
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  buttonBlurContainer: {
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   signInButton: {
-    width: "100%",
-    height: 54,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
   signInButtonContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   signInButtonText: {
     color: "#FFFFFF",

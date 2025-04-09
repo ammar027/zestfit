@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useContext } from "react"
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, Dimensions, Animated, StatusBar } from "react-native"
-import { useNavigation, NavigationProp, ParamListBase, DrawerActions } from "@react-navigation/native"
+import { useNavigation, NavigationProp, ParamListBase, useRoute } from "@react-navigation/native"
 import { supabase } from "../utils/supabaseClient"
-import { RootStackParamList } from "../types/navigation"
-import { DrawerNavigationProp } from "@react-navigation/drawer"
-import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { AuthContext } from "../App"
 import { useTheme } from "../theme"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
-type AuthScreenNavigationProp = DrawerNavigationProp<RootStackParamList, "Auth">
+// Define the type for route params
+type AuthScreenParams = {
+  onLoginSuccess: () => void
+}
 
 export default function AuthScreen() {
   const { theme } = useTheme()
@@ -22,6 +25,8 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const navigation = useNavigation<NavigationProp<ParamListBase>>()
+  const route = useRoute()
+  const params = route.params as AuthScreenParams
   const { setIsLoggedIn } = useContext(AuthContext)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const { height: screenHeight } = Dimensions.get("window")
@@ -86,10 +91,12 @@ export default function AuthScreen() {
         data: { session },
       } = await supabase.auth.getSession()
       if (session?.user) {
-        // Update global auth state
         setIsLoggedIn(true)
-        // Redirect to Home screen
-        navigation.navigate("Home")
+        if (params?.onLoginSuccess) {
+          params.onLoginSuccess()
+        } else {
+          navigation.goBack()
+        }
       }
     } catch (error: any) {
       console.error("Session check error:", error.message)
@@ -139,13 +146,14 @@ export default function AuthScreen() {
         if (error) throw error
 
         if (data.user) {
-          // Update global auth state
           setIsLoggedIn(true)
-          // Redirect to Home screen
-          navigation.navigate("Home")
+          if (params?.onLoginSuccess) {
+            params.onLoginSuccess()
+          } else {
+            navigation.goBack()
+          }
         }
       } else {
-        // Signup mode
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -158,7 +166,6 @@ export default function AuthScreen() {
 
         if (error) throw error
 
-        // Create profile entry
         if (data.user) {
           const { error: profileError } = await supabase.from("profiles").upsert({
             user_id: data.user.id,
@@ -170,9 +177,6 @@ export default function AuthScreen() {
           if (profileError) {
             console.error("Profile creation error:", profileError)
           }
-
-          // Don't set global auth state for signup until email verification
-          // setIsLoggedIn(true)
         }
 
         Alert.alert("Signup Successful", "Please check your email for confirmation", [{ text: "OK", onPress: () => setMode("login") }])
@@ -215,27 +219,28 @@ export default function AuthScreen() {
   const Header = () => {
     return (
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-          <MaterialCommunityIcons name="menu" size={28} color={theme.colors.text} />
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)" }]} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Sign In</Text>
-        <View style={{ width: 28 }} />
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
+        <View style={{ width: 40 }} />
       </View>
     )
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} />
+      {/* <LinearGradient colors={theme.dark ? ["#1E1E28", "#242430"] : ["#f7f7fc", "#f0f0f7"]} style={StyleSheet.absoluteFill} /> */}
+
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 20}>
         <ScrollView contentContainerStyle={[styles.scrollContainer, keyboardVisible && { paddingBottom: 120 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Header />
           <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerSmall]}>
             <Image
-              source={require("../assets/icons/adaptive-icon.png")}
+              source={theme.dark ? require("../assets/icons/adaptive-icon-dark.png") : require("../assets/icons/adaptive-icon.png")}
               style={{
-                width: keyboardVisible ? 200 : 320,
-                height: keyboardVisible ? 200 : 320,
+                width: keyboardVisible ? 200 : 290,
+                height: keyboardVisible ? 200 : 290,
                 alignSelf: "center",
                 marginVertical: keyboardVisible ? -30 : -70,
                 marginBottom: keyboardVisible ? -80 : -120,
@@ -248,98 +253,108 @@ export default function AuthScreen() {
             <Text style={[styles.subHeader, { color: theme.colors.subtext }]}>{mode === "login" ? "Sign in to access your health and fitness journey" : "Join ZestFit to start your health and fitness journey"}</Text>
           </Animated.View>
 
-          <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            {mode === "signup" && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Full Name</Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      borderColor: theme.colors.input.border,
-                      backgroundColor: theme.colors.input.background,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="account" size={22} color={theme.colors.primary} style={styles.inputIcon} />
-                  <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your full name" placeholderTextColor={theme.colors.input.placeholder} value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
+          <Animated.View style={[styles.formCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.blurContainer, { borderColor: theme.colors.border }]}>
+              <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={styles.formGradient}>
+                <View style={styles.formContainer}>
+                  {mode === "signup" && (
+                    <View style={styles.inputContainer}>
+                      <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Full Name</Text>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          {
+                            borderColor: theme.colors.input.border,
+                            backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : theme.colors.input.background,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons name="account" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                        <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your full name" placeholderTextColor={theme.colors.input.placeholder} value={fullName} onChangeText={setFullName} autoCapitalize="words" returnKeyType="next" blurOnSubmit={false} />
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email</Text>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        {
+                          borderColor: theme.colors.input.border,
+                          backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : theme.colors.input.background,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="email-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                      <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your email" placeholderTextColor={theme.colors.input.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        {
+                          borderColor: theme.colors.input.border,
+                          backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : theme.colors.input.background,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                      <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your password" placeholderTextColor={theme.colors.input.placeholder} value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                        <MaterialCommunityIcons name={showPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {mode === "signup" && (
+                    <View style={styles.inputContainer}>
+                      <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Confirm Password</Text>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          {
+                            borderColor: theme.colors.input.border,
+                            backgroundColor: theme.dark ? "rgba(255,255,255,0.05)" : theme.colors.input.background,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
+                        <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Confirm your password" placeholderTextColor={theme.colors.input.placeholder} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirmPassword} autoCapitalize="none" returnKeyType="done" />
+                        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                          <MaterialCommunityIcons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {mode === "login" && (
+                    <TouchableOpacity onPress={handleForgotPassword}>
+                      <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              </View>
-            )}
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email</Text>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    borderColor: theme.colors.input.border,
-                    backgroundColor: theme.colors.input.background,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons name="email-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
-                <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your email" placeholderTextColor={theme.colors.input.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" returnKeyType="next" blurOnSubmit={false} />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    borderColor: theme.colors.input.border,
-                    backgroundColor: theme.colors.input.background,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
-                <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Enter your password" placeholderTextColor={theme.colors.input.placeholder} value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" returnKeyType={mode === "login" ? "done" : "next"} />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                  <MaterialCommunityIcons name={showPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {mode === "signup" && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Confirm Password</Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      borderColor: theme.colors.input.border,
-                      backgroundColor: theme.colors.input.background,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="lock-outline" size={22} color={theme.colors.primary} style={styles.inputIcon} />
-                  <TextInput style={[styles.input, { color: theme.colors.input.text }]} placeholder="Confirm your password" placeholderTextColor={theme.colors.input.placeholder} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirmPassword} autoCapitalize="none" returnKeyType="done" />
-                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                    <MaterialCommunityIcons name={showConfirmPassword ? "eye-off" : "eye"} size={22} color={theme.colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {mode === "login" && (
-              <TouchableOpacity onPress={handleForgotPassword}>
-                <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>Forgot Password?</Text>
-              </TouchableOpacity>
-            )}
+              </LinearGradient>
+            </BlurView>
           </Animated.View>
 
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.colors.button.primary }]} onPress={handleAuth} disabled={loading} activeOpacity={0.8}>
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <View style={styles.buttonContent}>
-                  <MaterialCommunityIcons name={mode === "login" ? "login" : "account-plus"} size={20} color={theme.colors.button.text} style={styles.buttonIcon} />
-                  <Text style={[styles.primaryButtonText, { color: theme.colors.button.text }]}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
-                </View>
-              )}
+            <TouchableOpacity style={styles.buttonWrapper} onPress={handleAuth} disabled={loading} activeOpacity={0.7}>
+              <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={styles.buttonBlurContainer}>
+                <LinearGradient colors={[theme.colors.primary, `${theme.colors.primary}DD`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.primaryButton]}>
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <View style={styles.buttonContent}>
+                      <MaterialCommunityIcons name={mode === "login" ? "login" : "account-plus"} size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                      <Text style={[styles.primaryButtonText]}>{mode === "login" ? "Sign In" : "Create Account"}</Text>
+                    </View>
+                  )}
+                </LinearGradient>
+              </BlurView>
             </TouchableOpacity>
 
             <View style={styles.dividerContainer}>
@@ -348,21 +363,15 @@ export default function AuthScreen() {
               <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.secondaryButton,
-                {
-                  backgroundColor: theme.colors.button.secondary,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={() => setMode(mode === "login" ? "signup" : "login")}
-              activeOpacity={0.8}
-            >
-              <View style={styles.buttonContent}>
-                <MaterialCommunityIcons name={mode === "login" ? "account-plus-outline" : "login-variant"} size={20} color={theme.colors.text} style={styles.buttonIcon} />
-                <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
-              </View>
+            <TouchableOpacity style={styles.secondaryButtonWrapper} onPress={() => setMode(mode === "login" ? "signup" : "login")} activeOpacity={0.7}>
+              <BlurView intensity={20} tint={theme.dark ? "dark" : "light"} style={[styles.buttonBlurContainer, { borderColor: theme.colors.border }]}>
+                <LinearGradient colors={theme.dark ? ["rgba(30,30,40,0.8)", "rgba(20,20,30,0.75)"] : ["rgba(255,255,255,0.9)", "rgba(250,250,255,0.85)"]} style={[styles.secondaryButton]}>
+                  <View style={styles.buttonContent}>
+                    <MaterialCommunityIcons name={mode === "login" ? "account-plus-outline" : "login-variant"} size={20} color={theme.colors.text} style={styles.buttonIcon} />
+                    <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>{mode === "login" ? "Create New Account" : "Sign In Instead"}</Text>
+                  </View>
+                </LinearGradient>
+              </BlurView>
             </TouchableOpacity>
 
             <Text style={[styles.termsText, { color: theme.colors.subtext }]}>
@@ -387,19 +396,38 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: "center",
   },
+  formCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  blurContainer: {
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  formGradient: {
+    padding: 20,
+    borderRadius: 24,
+  },
   formContainer: {
     width: "100%",
-    marginBottom: 24,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 0,
+    marginTop: -70,
+    paddingTop: 20,
   },
   logoContainerSmall: {
     marginBottom: 0,
   },
   headerContainer: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   subHeader: {
     fontSize: 16,
@@ -442,25 +470,41 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: "500",
   },
+  buttonWrapper: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  secondaryButtonWrapper: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  buttonBlurContainer: {
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
   primaryButton: {
     height: 56,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   secondaryButton: {
     height: 56,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    marginBottom: 16,
   },
   buttonContent: {
     flexDirection: "row",
@@ -473,6 +517,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#FFFFFF",
   },
   secondaryButtonText: {
     fontSize: 16,
@@ -504,14 +549,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: 10,
+    marginBottom: 10,
   },
-  menuButton: {
+  backButton: {
     padding: 5,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
   },
 })
